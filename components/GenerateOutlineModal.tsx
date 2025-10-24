@@ -72,9 +72,17 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
                 jsonContent = arrayMatch[0];
               }
               
-              // Fix common JSON issues
-              // Fix missing opening quotes on property names
+              // Fix common JSON issues more aggressively
+              // 1. Fix missing opening quotes on property names: prop": -> "prop":
               jsonContent = jsonContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(":\s*)/g, '$1"$2$3');
+              
+              // 2. Fix unquoted values: ":section" -> ": "section"
+              // Match colon, optional space, unquoted word, then comma or closing brace
+              jsonContent = jsonContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]+)([",}\]])/g, ': "$1"$2');
+              
+              // 3. Fix missing colon: "key" "value" -> "key": "value"
+              // Match quote-space-quote pattern at property boundaries
+              jsonContent = jsonContent.replace(/("\w+")\s+("/g, '$1: $2');
               
               // Fix missing closing quotes before commas or next property
               // Pattern: "key": "value    "nextKey" -> "key": "value",    "nextKey"
@@ -113,11 +121,11 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
               } else {
                 setError("Invalid outline format received - expected an array of chapters");
               }
-            } catch (e) {
-              console.error("Failed to parse outline:", e);
-              console.error("Raw content:", fullContent);
-              setError("Failed to parse outline. The AI returned invalid or incomplete JSON. Try regenerating.");
-            }
+              } catch (e) {
+                console.error("Failed to parse outline:", e);
+                console.error("Raw content:", fullContent);
+                setError("Failed to parse outline. The AI returned invalid or incomplete JSON. Try regenerating. (Note: GPT-5 can be less reliable with JSON. Consider using OPENAI_MODEL=gpt-4o in your .env for more reliable results.)");
+              }
             setIsGenerating(false);
           },
           onError: (err) => {

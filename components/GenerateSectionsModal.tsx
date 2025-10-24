@@ -94,8 +94,17 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
               jsonContent = arrayMatch[0];
             }
             
-            // Fix common JSON issues
+            // Fix common JSON issues more aggressively
+            // 1. Fix missing opening quotes on property names
             jsonContent = jsonContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(":\s*)/g, '$1"$2$3');
+            
+            // 2. Fix unquoted values after colon
+            jsonContent = jsonContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]+)([",}\]])/g, ': "$1"$2');
+            
+            // 3. Fix missing colon between property and value
+            jsonContent = jsonContent.replace(/("\w+")\s+("/g, '$1: $2');
+            
+            // 4. Fix missing closing quotes and commas
             jsonContent = jsonContent.replace(/"\s+"/g, '",\n    "');
             jsonContent = jsonContent.replace(/("\s+)([a-zA-Z_][a-zA-Z0-9_]*":\s*)/g, '",\n    $2');
             
@@ -127,7 +136,7 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
           } catch (e) {
             console.error("Failed to parse sections:", e);
             console.error("Raw content:", fullContent);
-            setError("Failed to parse AI response. Try regenerating.");
+            setError("Failed to parse AI response. Try regenerating. (Note: GPT-5 can be less reliable with JSON. Consider using OPENAI_MODEL=gpt-4o in your .env for more reliable results.)");
           }
           setIsGenerating(false);
         },
