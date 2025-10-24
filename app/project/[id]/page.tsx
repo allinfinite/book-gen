@@ -8,6 +8,7 @@ import { Chapter } from "@/types/book";
 import { ChapterEditor } from "@/components/ChapterEditor";
 import { AISidebar } from "@/components/AISidebar";
 import { GenerateOutlineModal } from "@/components/GenerateOutlineModal";
+import { GenerateSectionsModal } from "@/components/GenerateSectionsModal";
 import { BookSettingsModal } from "@/components/BookSettingsModal";
 import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown, Settings, ChevronRight } from "lucide-react";
 
@@ -36,10 +37,12 @@ export default function ProjectPage() {
   } = useUIStore();
 
   const [chapterTitle, setChapterTitle] = useState("");
-  const [chapterContent, setChapterContent] = useState("");
+  const [sectionContent, setSectionContent] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showAddChapterMenu, setShowAddChapterMenu] = useState(false);
   const [showGenerateOutlineModal, setShowGenerateOutlineModal] = useState(false);
+  const [showGenerateSectionsModal, setShowGenerateSectionsModal] = useState(false);
   const [showBookSettings, setShowBookSettings] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
 
@@ -56,13 +59,41 @@ export default function ProjectPage() {
       );
       if (chapter) {
         setChapterTitle(chapter.title);
-        // Combine all section content
-        setChapterContent(
-          chapter.sections.map((s) => `## ${s.title}\n\n${s.content}`).join("\n\n")
-        );
+        // Auto-expand the selected chapter in sidebar
+        setExpandedChapters((prev) => new Set(prev).add(selectedChapterId));
+        // Auto-select first section if none selected
+        if (!selectedSectionId && chapter.sections.length > 0) {
+          setSelectedSectionId(chapter.sections[0].id);
+        }
       }
     }
   }, [selectedChapterId, currentProject]);
+
+  // Load selected section content
+  useEffect(() => {
+    if (selectedChapterId && selectedSectionId && currentProject) {
+      const chapter = currentProject.chapters.find(
+        (ch) => ch.id === selectedChapterId
+      );
+      if (chapter) {
+        const section = chapter.sections.find((s) => s.id === selectedSectionId);
+        if (section) {
+          setSectionContent(section.content);
+        }
+      }
+    }
+  }, [selectedChapterId, selectedSectionId, currentProject]);
+
+  // Auto-save section content
+  useEffect(() => {
+    if (!selectedChapterId || !selectedSectionId || !currentProject) return;
+    
+    const timeoutId = setTimeout(() => {
+      handleSaveSection();
+    }, 2000); // Auto-save after 2 seconds of no typing
+
+    return () => clearTimeout(timeoutId);
+  }, [sectionContent]);
 
   async function handleAddChapter() {
     const newChapter: Chapter = {
@@ -100,22 +131,58 @@ export default function ProjectPage() {
     });
   }
 
-  function scrollToSection(sectionTitle: string) {
-    // Find the section heading in the editor and scroll to it
-    const editorElement = document.querySelector('.chapter-editor');
-    if (!editorElement) return;
-    
-    const headings = editorElement.querySelectorAll('h2, h3');
-    for (const heading of headings) {
-      if (heading.textContent?.includes(sectionTitle)) {
-        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        break;
-      }
-    }
+  function handleSelectSection(sectionId: string) {
+    setSelectedSectionId(sectionId);
   }
 
-  async function handleSaveChapter() {
+  function handleAddSection() {
     if (!selectedChapterId || !currentProject) return;
+    
+    const chapter = currentProject.chapters.find((ch) => ch.id === selectedChapterId);
+    if (!chapter) return;
+
+    const newSection = {
+      id: crypto.randomUUID(),
+      title: `Section ${chapter.sections.length + 1}`,
+      content: "",
+    };
+
+    updateChapter(selectedChapterId, {
+      sections: [...chapter.sections, newSection],
+    });
+
+    setSelectedSectionId(newSection.id);
+    save();
+  }
+
+  function handleDeleteSection(sectionId: string) {
+    if (!selectedChapterId || !currentProject) return;
+    
+    const chapter = currentProject.chapters.find((ch) => ch.id === selectedChapterId);
+    if (!chapter || chapter.sections.length <= 1) {
+      alert("Cannot delete the last section");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete this section?")) {
+      return;
+    }
+
+    const updatedSections = chapter.sections.filter((s) => s.id !== sectionId);
+    updateChapter(selectedChapterId, {
+      sections: updatedSections,
+    });
+
+    // Select another section
+    if (selectedSectionId === sectionId) {
+      setSelectedSectionId(updatedSections[0]?.id || null);
+    }
+
+    save();
+  }
+
+  async function handleSaveSection() {
+    if (!selectedChapterId || !selectedSectionId || !currentProject) return;
 
     setIsSaving(true);
     const chapter = currentProject.chapters.find(
@@ -123,24 +190,21 @@ export default function ProjectPage() {
     );
     if (!chapter) return;
 
-    // Parse content into sections
-    const sections = chapterContent
-      .split(/\n## /)
-      .filter((s) => s.trim())
-      .map((sectionText, idx) => {
-        const [titleLine, ...contentLines] = sectionText.split("\n");
-        return {
-          id: chapter.sections[idx]?.id || crypto.randomUUID(),
-          title: titleLine.replace(/^## /, "").trim() || `Section ${idx + 1}`,
-          content: contentLines.join("\n").trim(),
-        };
-      });
+    // Update the specific section
+    const updatedSections = chapter.sections.map((section) =>
+      section.id === selectedSectionId
+        ? { ...section, content: sectionContent }
+        : section
+    );
 
-    const wordCount = chapterContent.split(/\s+/).filter(Boolean).length;
+    // Calculate total word count
+    const wordCount = updatedSections
+      .map((s) => s.content.split(/\s+/).filter(Boolean).length)
+      .reduce((a, b) => a + b, 0);
 
     updateChapter(selectedChapterId, {
       title: chapterTitle,
-      sections: sections.length > 0 ? sections : chapter.sections,
+      sections: updatedSections,
       status: "draft",
       wordCount,
     });
@@ -403,27 +467,32 @@ export default function ProjectPage() {
                       {/* Nested Sections */}
                       {isExpanded && chapter.sections.length > 0 && (
                         <div className="ml-6 space-y-1">
-                          {chapter.sections.map((section, sectionIdx) => (
-                            <button
-                              key={section.id}
-                              onClick={() => {
-                                setSelectedChapter(chapter.id);
-                                setTimeout(() => scrollToSection(section.title), 100);
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
-                                isSelected
-                                  ? "bg-primary/20 hover:bg-primary/30"
-                                  : "bg-muted/50 hover:bg-muted"
-                              }`}
-                            >
-                              <div className="font-medium">{section.title}</div>
-                              {section.content && (
-                                <div className="text-muted-foreground mt-0.5">
-                                  {section.content.split(/\s+/).length} words
-                                </div>
-                              )}
-                            </button>
-                          ))}
+                          {chapter.sections.map((section, sectionIdx) => {
+                            const isSectionSelected = selectedSectionId === section.id && isSelected;
+                            return (
+                              <button
+                                key={section.id}
+                                onClick={() => {
+                                  setSelectedChapter(chapter.id);
+                                  handleSelectSection(section.id);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
+                                  isSectionSelected
+                                    ? "bg-primary text-primary-foreground"
+                                    : isSelected
+                                    ? "bg-primary/20 hover:bg-primary/30"
+                                    : "bg-muted/50 hover:bg-muted"
+                                }`}
+                              >
+                                <div className="font-medium">{section.title}</div>
+                                {section.content && (
+                                  <div className={`mt-0.5 ${isSectionSelected ? "opacity-90" : "text-muted-foreground"}`}>
+                                    {section.content.split(/\s+/).filter(Boolean).length} words
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -436,42 +505,132 @@ export default function ProjectPage() {
 
         {/* Editor */}
         <main className="flex-1 overflow-y-auto">
-          {selectedChapterId ? (
+          {selectedChapterId && selectedSectionId ? (
             <div className="max-w-4xl mx-auto p-8">
+              {/* Chapter Title */}
               <div className="mb-6">
                 <input
                   type="text"
                   value={chapterTitle}
                   onChange={(e) => setChapterTitle(e.target.value)}
+                  onBlur={handleSaveSection}
                   className="w-full text-3xl font-bold bg-transparent border-none outline-none mb-2"
                   placeholder="Chapter Title"
                 />
                 <div className="h-px bg-border"></div>
               </div>
 
+              {/* Section Navigation */}
+              {(() => {
+                const chapter = currentProject?.chapters.find((ch) => ch.id === selectedChapterId);
+                const currentSection = chapter?.sections.find((s) => s.id === selectedSectionId);
+                const sectionIndex = chapter?.sections.findIndex((s) => s.id === selectedSectionId) || 0;
+                const sectionWordCount = sectionContent.split(/\s+/).filter(Boolean).length;
+                
+                return chapter && currentSection ? (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between gap-4 mb-4">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={currentSection.title}
+                          onChange={(e) => {
+                            const updatedSections = chapter.sections.map((s) =>
+                              s.id === selectedSectionId ? { ...s, title: e.target.value } : s
+                            );
+                            updateChapter(selectedChapterId, { sections: updatedSections });
+                          }}
+                          onBlur={() => save()}
+                          className="w-full text-xl font-semibold bg-transparent border-b border-border outline-none focus:border-primary transition-colors"
+                          placeholder="Section Title"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleAddSection}
+                          className="px-3 py-1.5 text-sm border border-input rounded-md hover:bg-accent flex items-center gap-1"
+                          title="Add new section"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Section
+                        </button>
+                        <button
+                          onClick={() => setShowGenerateSectionsModal(true)}
+                          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center gap-1"
+                          title="AI generate all sections"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          AI Sections
+                        </button>
+                        {chapter.sections.length > 1 && (
+                          <button
+                            onClick={() => handleDeleteSection(selectedSectionId)}
+                            className="p-1.5 text-sm border border-input rounded-md hover:bg-destructive/10 hover:border-destructive text-destructive"
+                            title="Delete section"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Section selector tabs */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border">
+                      {chapter.sections.map((section, idx) => (
+                        <button
+                          key={section.id}
+                          onClick={() => handleSelectSection(section.id)}
+                          className={`px-4 py-2 text-sm whitespace-nowrap rounded-t-md transition-colors ${
+                            section.id === selectedSectionId
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted hover:bg-muted/80"
+                          }`}
+                        >
+                          {idx + 1}. {section.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
               <ChapterEditor
-                content={chapterContent}
-                onChange={setChapterContent}
-                placeholder="Start writing your chapter... Use ## for section headings."
+                content={sectionContent}
+                onChange={setSectionContent}
+                placeholder="Start writing this section..."
               />
 
               <div className="mt-4 flex items-center justify-between text-sm">
-                <span
-                  className={`${
-                    isInRange ? "text-muted-foreground" : "text-destructive"
-                  }`}
-                >
-                  Word count: {wordCount}
-                  {currentProject.targets.minChapterWords && (
-                    <span className="ml-2">
-                      (Target: {currentProject.targets.minChapterWords}–
-                      {currentProject.targets.maxChapterWords})
-                    </span>
-                  )}
-                </span>
-                {!isInRange && (
-                  <span className="text-destructive">⚠ Outside target range</span>
-                )}
+                {(() => {
+                  const chapter = currentProject?.chapters.find((ch) => ch.id === selectedChapterId);
+                  const sectionWordCount = sectionContent.split(/\s+/).filter(Boolean).length;
+                  const chapterWordCount = chapter?.sections
+                    .map((s) => (s.id === selectedSectionId ? sectionContent : s.content).split(/\s+/).filter(Boolean).length)
+                    .reduce((a, b) => a + b, 0) || 0;
+                  
+                  const minWords = currentProject?.targets.minSectionWords;
+                  const maxWords = currentProject?.targets.maxSectionWords;
+                  const isInRange = !minWords || (sectionWordCount >= minWords && sectionWordCount <= (maxWords || Infinity));
+                  
+                  return (
+                    <>
+                      <span className={`${isInRange ? "text-muted-foreground" : "text-destructive"}`}>
+                        Section: {sectionWordCount} words
+                        {minWords && (
+                          <span className="ml-2">
+                            (Target: {minWords}–{maxWords})
+                          </span>
+                        )}
+                        <span className="ml-4 text-muted-foreground">
+                          Chapter total: {chapterWordCount} words
+                        </span>
+                      </span>
+                      {!isInRange && minWords && (
+                        <span className="text-destructive">⚠ Outside target range</span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -495,6 +654,15 @@ export default function ProjectPage() {
         isOpen={showGenerateOutlineModal}
         onClose={() => setShowGenerateOutlineModal(false)}
       />
+
+      {/* Generate Sections Modal */}
+      {selectedChapterId && (
+        <GenerateSectionsModal
+          isOpen={showGenerateSectionsModal}
+          onClose={() => setShowGenerateSectionsModal(false)}
+          chapterId={selectedChapterId}
+        />
+      )}
 
       {/* Book Settings Modal */}
       <BookSettingsModal

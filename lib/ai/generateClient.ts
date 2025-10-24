@@ -1,7 +1,8 @@
 import { GenerateRequest } from "@/types/api";
 
 export interface StreamOptions {
-  onContent: (content: string) => void;
+  onContent?: (content: string) => void;
+  onChunk?: (chunk: string) => void; // Alias for onContent
   onComplete?: () => void;
   onError?: (error: string) => void;
   signal?: AbortSignal;
@@ -11,7 +12,8 @@ export async function streamGenerate(
   request: GenerateRequest,
   options: StreamOptions
 ): Promise<void> {
-  const { onContent, onComplete, onError, signal } = options;
+  const { onContent, onChunk, onComplete, onError, signal } = options;
+  const contentHandler = onContent || onChunk;
 
   try {
     const response = await fetch("/api/generate", {
@@ -58,7 +60,7 @@ export async function streamGenerate(
               return;
             }
             if (parsed.content) {
-              onContent(parsed.content);
+              contentHandler?.(parsed.content);
             }
           } catch (e) {
             // Skip invalid JSON

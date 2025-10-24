@@ -27,6 +27,7 @@ export const GenerateTaskSchema = z.enum([
   "revise_outline",
   "chapter_draft",
   "section_draft",
+  "sections", // Generate all sections for a chapter
   "rewrite",
   "style_check",
 ]);
@@ -38,6 +39,7 @@ export const GenerateRequestSchema = z.object({
   project: z.custom<Partial<BookProject>>(),
   targetId: z.string().optional(),
   userBrief: z.string().optional(),
+  context: z.any().optional(), // For sections generation
   controls: z
     .object({
       temperature: z.number().optional(),
@@ -51,6 +53,7 @@ export type GenerateRequest = {
   project: Partial<BookProject>;
   targetId?: string;
   userBrief?: string;
+  context?: any; // For sections generation
   controls?: {
     temperature?: number;
     maxTokens?: number;

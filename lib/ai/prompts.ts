@@ -177,6 +177,79 @@ Draft the section content now.`;
   return { system, user };
 }
 
+export function buildSectionsGeneratorPrompt(
+  project: Partial<BookProject>,
+  chapterId: string,
+  context: {
+    chapterTitle: string;
+    chapterSynopsis?: string;
+    existingSections?: string[];
+    userBrief?: string;
+  }
+): { system: string; user: string } {
+  const preset = getStylePreset(project);
+  const targets = project.targets;
+
+  const system = `You are a professional chapter architect. You create complete sections with full content for a chapter. You MUST obey the style lock strictly.
+
+Book Type:
+- Genre: ${project.meta?.genre || "General"}
+- Audience: ${targets?.audience || "General"}
+
+Style Lock (ENFORCE STRICTLY):
+- POV: ${preset?.pov}
+- Tense: ${preset?.tense}
+- Voice: "${preset?.voice}"
+${preset?.constraints?.length ? `- Constraints: ${preset.constraints.join(", ")}` : ""}
+
+Targets:
+${targets?.minSectionWords ? `- Section words: ${targets.minSectionWords}–${targets.maxSectionWords}` : "- Aim for substantial section content (300-800 words each)"}
+
+Task: Generate an array of sections with FULL CONTENT (not just titles). Return JSON array of objects:
+[
+  {
+    "title": "Section title",
+    "content": "Full section content in markdown format..."
+  }
+]
+
+Rules:
+- Generate 3-6 sections for the chapter
+- Each section must have COMPLETE, READY-TO-READ content
+- Match genre conventions and audience expectations
+- Keep continuity and logical flow between sections
+- Stay strictly within style lock (POV, tense, voice)
+- Return ONLY valid JSON, no explanatory text, no markdown code fences
+- Start your response with [ and end with ]
+- Every section MUST have both "title" and "content" fields
+- Content should be substantial prose, not outlines or placeholders
+- Ensure all property names and string values are properly quoted
+
+Example format:
+[
+  {
+    "title": "Opening Scene",
+    "content": "The morning sun crept through the blinds, painting golden stripes across the hardwood floor. Sarah hadn't slept. She sat at her kitchen table..."
+  },
+  {
+    "title": "The Discovery",
+    "content": "Three hours later, Sarah stood in front of the old bookstore on Fifth Avenue. The faded sign read 'Antiquarian Books & Curiosities'..."
+  }
+]`;
+
+  const user = `Book premise: ${project.premise || ""}
+
+Chapter: ${context.chapterTitle}
+${context.chapterSynopsis ? `Synopsis: ${context.chapterSynopsis}` : ""}
+${context.existingSections?.length ? `\nCurrent section titles (for reference): ${context.existingSections.join(", ")}` : ""}
+
+${context.userBrief ? `Additional instructions: ${context.userBrief}` : ""}
+
+Generate the sections with full content now.`;
+
+  return { system, user };
+}
+
 export function buildRewritePrompt(
   project: Partial<BookProject>,
   excerpt: string,

@@ -4,6 +4,7 @@ import {
   buildOutlinePrompt,
   buildChapterDraftPrompt,
   buildSectionDraftPrompt,
+  buildSectionsGeneratorPrompt,
   buildRewritePrompt,
   buildStyleCheckPrompt,
   buildReviseOutlinePrompt,
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { task, project, targetId, userBrief, controls } = parsed.data;
+    const { task, project, targetId, userBrief, controls, context } = parsed.data;
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -104,6 +105,19 @@ export async function POST(req: NextRequest) {
         );
         systemPrompt = sectionPrompts.system;
         userPrompt = sectionPrompts.user;
+        break;
+
+      case "sections":
+        if (!targetId) {
+          throw new Error("Chapter ID required");
+        }
+        const sectionsPrompts = buildSectionsGeneratorPrompt(
+          project,
+          targetId,
+          context || {}
+        );
+        systemPrompt = sectionsPrompts.system;
+        userPrompt = sectionsPrompts.user;
         break;
 
       case "rewrite":
