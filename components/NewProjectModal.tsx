@@ -18,6 +18,7 @@ export function NewProjectModal() {
   const router = useRouter();
   const { showNewProjectModal, closeNewProjectModal } = useUIStore();
   const setProject = useProjectStore((state) => state.setProject);
+  const save = useProjectStore((state) => state.save);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -35,7 +36,7 @@ export function NewProjectModal() {
 
   if (!showNewProjectModal) return null;
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!title.trim()) {
       alert("Please enter a project title");
       return;
@@ -72,6 +73,7 @@ export function NewProjectModal() {
     };
 
     setProject(newProject);
+    await save(); // Save to IndexedDB immediately
     closeNewProjectModal();
     router.push(`/project/${projectId}`);
   }
