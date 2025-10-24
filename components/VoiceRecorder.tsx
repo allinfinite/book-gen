@@ -88,8 +88,14 @@ export function VoiceRecorder({
       };
       updateLevel();
 
+      // Try to get the best audio quality
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
+        mimeType,
+        audioBitsPerSecond: 128000, // Higher quality
       });
 
       mediaRecorderRef.current = mediaRecorder;
@@ -118,7 +124,8 @@ export function VoiceRecorder({
         stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorder.start();
+      // Start recording with time slice to ensure we capture all data
+      mediaRecorder.start(100); // Capture data every 100ms
       startRecording();
       startTimeRef.current = Date.now();
 
