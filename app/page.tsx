@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAllProjects } from "@/lib/idb";
+import { getAllProjects, deleteProject } from "@/lib/idb";
 import { BookProject } from "@/types/book";
 import { useUIStore } from "@/store/useUIStore";
 import { NewProjectModal } from "@/components/NewProjectModal";
-import { Book, Plus, FileText } from "lucide-react";
+import { Book, Plus, FileText, Trash2 } from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();
@@ -26,6 +26,22 @@ export default function HomePage() {
       console.error("Failed to load projects:", error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleDeleteProject(projectId: string, projectTitle: string, e: React.MouseEvent) {
+    e.stopPropagation(); // Prevent navigation to project
+
+    if (!confirm(`Are you sure you want to delete "${projectTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteProject(projectId);
+      await loadProjects(); // Reload the list
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      alert("Failed to delete project. Please try again.");
     }
   }
 
@@ -80,9 +96,9 @@ export default function HomePage() {
               <div
                 key={project.meta.id}
                 onClick={() => router.push(`/project/${project.meta.id}`)}
-                className="border border-border rounded-lg p-6 hover:border-primary cursor-pointer transition-colors"
+                className="border border-border rounded-lg p-6 hover:border-primary cursor-pointer transition-colors relative group"
               >
-                <h3 className="text-lg font-semibold mb-2">
+                <h3 className="text-lg font-semibold mb-2 pr-8">
                   {project.meta.title}
                 </h3>
                 {project.meta.subtitle && (
@@ -98,6 +114,13 @@ export default function HomePage() {
                   Updated{" "}
                   {new Date(project.meta.updatedAt).toLocaleDateString()}
                 </div>
+                <button
+                  onClick={(e) => handleDeleteProject(project.meta.id, project.meta.title, e)}
+                  className="absolute top-4 right-4 p-2 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-opacity"
+                  title="Delete project"
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </button>
               </div>
             ))}
           </div>

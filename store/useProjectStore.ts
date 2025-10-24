@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { BookProject, Chapter, Section, OutlineNode, ChangeRecord } from "@/types/book";
-import { saveProject, getProject, createSnapshot } from "@/lib/idb";
+import { saveProject, getProject, createSnapshot, deleteProject as deleteProjectFromDB } from "@/lib/idb";
 
 interface ProjectState {
   currentProject: BookProject | null;
@@ -11,6 +11,7 @@ interface ProjectState {
   // Actions
   loadProject: (id: string) => Promise<void>;
   setProject: (project: BookProject) => void;
+  deleteProject: (id: string) => Promise<void>;
   updateMeta: (updates: Partial<BookProject["meta"]>) => void;
   updatePremise: (premise: string) => void;
   updateOutline: (outline: OutlineNode[]) => void;
@@ -55,6 +56,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setProject: (project: BookProject) => {
     set({ currentProject: project });
+  },
+
+  deleteProject: async (id: string) => {
+    await deleteProjectFromDB(id);
+    const { currentProject } = get();
+    if (currentProject?.meta.id === id) {
+      set({ currentProject: null });
+    }
   },
 
   updateMeta: (updates) => {

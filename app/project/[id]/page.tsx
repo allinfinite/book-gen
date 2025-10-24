@@ -8,7 +8,7 @@ import { Chapter } from "@/types/book";
 import { ChapterEditor } from "@/components/ChapterEditor";
 import { AISidebar } from "@/components/AISidebar";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
-import { Book, Plus, Save, ArrowLeft, FileDown, Mic } from "lucide-react";
+import { Book, Plus, Save, ArrowLeft, FileDown, Mic, Trash2 } from "lucide-react";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -22,6 +22,8 @@ export default function ProjectPage() {
     loadProject,
     addChapter,
     updateChapter,
+    deleteChapter,
+    deleteProject,
     save,
   } = useProjectStore();
 
@@ -124,6 +126,31 @@ export default function ProjectPage() {
     // setShowVoiceRecorder(false);
   }
 
+  async function handleDeleteChapter(chapterId: string) {
+    if (!confirm("Are you sure you want to delete this chapter? This action cannot be undone.")) {
+      return;
+    }
+
+    deleteChapter(chapterId);
+    await save();
+
+    // If we deleted the currently selected chapter, clear selection
+    if (selectedChapterId === chapterId) {
+      setSelectedChapter(null);
+    }
+  }
+
+  async function handleDeleteProject() {
+    if (!currentProject) return;
+
+    if (!confirm(`Are you sure you want to delete "${currentProject.meta.title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    await deleteProject(currentProject.meta.id);
+    router.push("/");
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -212,6 +239,13 @@ export default function ProjectPage() {
               <FileDown className="w-4 h-4" />
               Export
             </button>
+            <button
+              onClick={handleDeleteProject}
+              className="flex items-center gap-2 px-4 py-2 border border-destructive text-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground"
+              title="Delete Project"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
@@ -238,24 +272,38 @@ export default function ProjectPage() {
                 currentProject.chapters.map((chapter, idx) => (
                   <div
                     key={chapter.id}
-                    onClick={() => setSelectedChapter(chapter.id)}
-                    className={`p-3 rounded-md cursor-pointer transition-colors ${
+                    className={`p-3 rounded-md transition-colors relative group ${
                       selectedChapterId === chapter.id
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted hover:bg-muted/80"
                     }`}
                   >
-                    <div className="text-sm font-medium">
-                      Chapter {idx + 1}: {chapter.title}
-                    </div>
-                    <div className="text-xs opacity-75 mt-1">
-                      {chapter.sections.length} sections • {chapter.status}
-                    </div>
-                    {chapter.wordCount && (
-                      <div className="text-xs opacity-75 mt-1">
-                        {chapter.wordCount} words
+                    <div
+                      onClick={() => setSelectedChapter(chapter.id)}
+                      className="cursor-pointer"
+                    >
+                      <div className="text-sm font-medium pr-8">
+                        Chapter {idx + 1}: {chapter.title}
                       </div>
-                    )}
+                      <div className="text-xs opacity-75 mt-1">
+                        {chapter.sections.length} sections • {chapter.status}
+                      </div>
+                      {chapter.wordCount && (
+                        <div className="text-xs opacity-75 mt-1">
+                          {chapter.wordCount} words
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChapter(chapter.id);
+                      }}
+                      className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-opacity"
+                      title="Delete chapter"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
                   </div>
                 ))
               )}
