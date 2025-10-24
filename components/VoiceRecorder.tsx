@@ -103,12 +103,15 @@ export function VoiceRecorder({
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
+          console.log("Audio chunk received:", event.data.size, "bytes");
           chunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = async () => {
+        console.log("Recording stopped. Total chunks:", chunksRef.current.length);
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        console.log("Blob created:", blob.size, "bytes");
 
         // Clean up audio context
         if (animationFrameRef.current) {
@@ -126,6 +129,7 @@ export function VoiceRecorder({
 
       // Start recording with time slice to ensure we capture all data
       mediaRecorder.start(100); // Capture data every 100ms
+      console.log("Recording started with 100ms time slice");
       startRecording();
       startTimeRef.current = Date.now();
 
@@ -143,6 +147,8 @@ export function VoiceRecorder({
 
   function handleStopRecording() {
     if (mediaRecorderRef.current && isRecording) {
+      const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      console.log("Stopping recording. Duration:", duration, "seconds");
       mediaRecorderRef.current.stop();
       stopRecording();
 
