@@ -45,8 +45,9 @@ export function ChapterEditor({
     ],
     content,
     onUpdate: ({ editor }) => {
-      const markdown = editor.storage.markdown?.getMarkdown?.() || editor.getText();
-      onChange(markdown);
+      // Get HTML and convert back to markdown-like text
+      const html = editor.getHTML();
+      onChange(html);
     },
     editorProps: {
       attributes: {
