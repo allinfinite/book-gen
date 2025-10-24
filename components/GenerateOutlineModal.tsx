@@ -72,6 +72,31 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
                 jsonContent = arrayMatch[0];
               }
               
+              // Fix common JSON issues
+              // Fix missing opening quotes on property names
+              jsonContent = jsonContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(":\s*)/g, '$1"$2$3');
+              
+              // Try to fix truncated JSON by closing open brackets
+              const openBrackets = (jsonContent.match(/\[/g) || []).length;
+              const closeBrackets = (jsonContent.match(/\]/g) || []).length;
+              const openBraces = (jsonContent.match(/\{/g) || []).length;
+              const closeBraces = (jsonContent.match(/\}/g) || []).length;
+              
+              if (openBraces > closeBraces || openBrackets > closeBrackets) {
+                // Truncated JSON - try to close it
+                console.warn("JSON appears truncated, attempting to close open brackets");
+                let fixed = jsonContent;
+                // Close open objects
+                for (let i = 0; i < (openBraces - closeBraces); i++) {
+                  fixed += "}";
+                }
+                // Close open arrays
+                for (let i = 0; i < (openBrackets - closeBrackets); i++) {
+                  fixed += "]";
+                }
+                jsonContent = fixed;
+              }
+              
               // Parse the JSON outline
               const parsed = JSON.parse(jsonContent);
               if (Array.isArray(parsed)) {
@@ -83,7 +108,7 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
             } catch (e) {
               console.error("Failed to parse outline:", e);
               console.error("Raw content:", fullContent);
-              setError("Failed to parse outline. The AI returned invalid JSON. Please try again.");
+              setError("Failed to parse outline. The AI returned invalid or incomplete JSON. Try regenerating.");
             }
             setIsGenerating(false);
           },
