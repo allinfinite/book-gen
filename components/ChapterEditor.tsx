@@ -28,6 +28,7 @@ export function ChapterEditor({
   placeholder = "Start writing your chapter...",
 }: ChapterEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: {
