@@ -80,6 +80,8 @@ export function VoiceRecorder({
       analyserRef.current = analyser;
 
       // Start visualization
+      let maxLevel = 0;
+      let levelCheckCount = 0;
       const updateLevel = () => {
         if (!analyserRef.current || !mediaRecorderRef.current) return;
 
@@ -87,7 +89,23 @@ export function VoiceRecorder({
         analyserRef.current.getByteFrequencyData(dataArray);
 
         const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        setAudioLevel(average / 255); // Normalize to 0-1
+        const normalizedLevel = average / 255;
+        setAudioLevel(normalizedLevel);
+
+        // Track max level for debugging
+        if (normalizedLevel > maxLevel) {
+          maxLevel = normalizedLevel;
+        }
+        levelCheckCount++;
+
+        // Log audio level every 50 frames
+        if (levelCheckCount % 50 === 0) {
+          console.log("Audio level check:", {
+            current: normalizedLevel.toFixed(3),
+            max: maxLevel.toFixed(3),
+            raw: average.toFixed(1),
+          });
+        }
 
         // Continue animation while recorder is active
         if (mediaRecorderRef.current?.state === "recording") {
@@ -157,6 +175,12 @@ export function VoiceRecorder({
     if (mediaRecorderRef.current && isRecording) {
       const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
       console.log("Stopping recording. Duration:", duration, "seconds");
+      console.log("Current audio level:", audioLevel.toFixed(3));
+
+      // Warn if audio level was too low
+      if (audioLevel < 0.01) {
+        console.warn("⚠️ Audio level is very low! Microphone might not be working or volume is too quiet.");
+      }
 
       // Request final data before stopping
       if (mediaRecorderRef.current.state === "recording") {

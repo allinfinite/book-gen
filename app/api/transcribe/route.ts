@@ -69,7 +69,11 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("Whisper API error:", error);
+      console.error("Whisper API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        error,
+      });
       return NextResponse.json(
         { error: "Transcription failed" },
         { status: response.status }
@@ -83,7 +87,14 @@ export async function POST(req: NextRequest) {
       textLength: result.text?.length || 0,
       text: result.text,
       durationMs,
+      hasLanguage: !!result.language,
+      language: result.language,
     });
+
+    // Warn if no text was transcribed
+    if (!result.text || result.text.trim().length === 0) {
+      console.warn("⚠️ Whisper returned empty transcription! Audio might contain no speech.");
+    }
 
     return NextResponse.json({
       text: result.text,
