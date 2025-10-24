@@ -82,7 +82,7 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
               
               // 3. Fix missing colon: "key" "value" -> "key": "value"
               // Match quote-space-quote pattern at property boundaries
-              jsonContent = jsonContent.replace(/("\w+")\s+("/g, '$1: $2');
+              jsonContent = jsonContent.replace(/"(\w+)"\s+"([^"]+)"/g, '"$1": "$2"');
               
               // Fix missing closing quotes before commas or next property
               // Pattern: "key": "value    "nextKey" -> "key": "value",    "nextKey"

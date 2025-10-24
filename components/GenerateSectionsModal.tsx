@@ -102,7 +102,7 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
             jsonContent = jsonContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]+)([",}\]])/g, ': "$1"$2');
             
             // 3. Fix missing colon between property and value
-            jsonContent = jsonContent.replace(/("\w+")\s+("/g, '$1: $2');
+            jsonContent = jsonContent.replace(/"(\w+)"\s+"([^"]+)"/g, '"$1": "$2"');
             
             // 4. Fix missing closing quotes and commas
             jsonContent = jsonContent.replace(/"\s+"/g, '",\n    "');

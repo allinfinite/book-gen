@@ -10,7 +10,7 @@ import {
   buildReviseOutlinePrompt,
 } from "@/lib/ai/prompts";
 
-const MAX_COMPLETION_TOKENS = 8000; // Maximum tokens in the AI response (increased for large outlines)
+const MAX_COMPLETION_TOKENS = 16000; // Maximum tokens in the AI response (increased for very large outlines)
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5"; // Use GPT-5 by default
 
