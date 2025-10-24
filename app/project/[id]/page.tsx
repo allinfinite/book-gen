@@ -113,9 +113,15 @@ export default function ProjectPage() {
   }
 
   function handleVoiceTranscription(text: string) {
+    console.log("Voice transcription received:", text);
     // Append transcribed text to content
-    setChapterContent((prev) => prev + "\n\n" + text);
-    setShowVoiceRecorder(false);
+    setChapterContent((prev) => {
+      const newContent = prev ? prev + "\n\n" + text : text;
+      console.log("New content:", newContent);
+      return newContent;
+    });
+    // Keep recorder open for continuous dictation
+    // setShowVoiceRecorder(false);
   }
 
   if (isLoading) {

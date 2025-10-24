@@ -44,6 +44,18 @@ export function VoiceRecorder({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isRecording]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
   async function handleStartRecording() {
     try {
       setError(null);
@@ -61,7 +73,7 @@ export function VoiceRecorder({
 
       // Start visualization
       const updateLevel = () => {
-        if (!analyserRef.current) return;
+        if (!analyserRef.current || !mediaRecorderRef.current) return;
 
         const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(dataArray);
@@ -69,7 +81,8 @@ export function VoiceRecorder({
         const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
         setAudioLevel(average / 255); // Normalize to 0-1
 
-        if (isRecording) {
+        // Continue animation while recorder is active
+        if (mediaRecorderRef.current?.state === "recording") {
           animationFrameRef.current = requestAnimationFrame(updateLevel);
         }
       };
@@ -135,6 +148,7 @@ export function VoiceRecorder({
 
   async function transcribeAudio(audioBlob: Blob) {
     setIsTranscribing(true);
+    console.log("Starting transcription...", audioBlob.size, "bytes");
 
     try {
       const formData = new FormData();
@@ -151,9 +165,16 @@ export function VoiceRecorder({
       }
 
       const result = await response.json();
-      onTranscriptionComplete(result.text);
-      setError(null);
+      console.log("Transcription result:", result);
+
+      if (result.text) {
+        onTranscriptionComplete(result.text);
+        setError(null);
+      } else {
+        throw new Error("No text returned from transcription");
+      }
     } catch (err: any) {
+      console.error("Transcription error:", err);
       const errorMessage = err.message || "Transcription failed";
       setError(errorMessage);
       onError?.(errorMessage);

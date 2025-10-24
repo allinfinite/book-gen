@@ -45,7 +45,8 @@ export function ChapterEditor({
     ],
     content,
     onUpdate: ({ editor }) => {
-      onChange(editor.getText());
+      const markdown = editor.storage.markdown?.getMarkdown?.() || editor.getText();
+      onChange(markdown);
     },
     editorProps: {
       attributes: {
