@@ -261,14 +261,6 @@ export default function ProjectPage() {
     );
   }
 
-  const wordCount = chapterContent.split(/\s+/).filter(Boolean).length;
-  const isInRange =
-    currentProject.targets.minChapterWords &&
-    currentProject.targets.maxChapterWords
-      ? wordCount >= currentProject.targets.minChapterWords &&
-        wordCount <= currentProject.targets.maxChapterWords
-      : true;
-
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
