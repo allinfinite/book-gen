@@ -154,60 +154,107 @@ export function PremiseModal({ projectId }: PremiseModalProps) {
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-card border border-border rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-border">
-          <h2 className="text-2xl font-bold mb-2">Book Premise</h2>
-          <p className="text-sm text-muted-foreground">
-            Describe your book idea. This will guide the AI in generating your
-            outline.
+          <h2 className="text-2xl font-bold mb-2">📚 Create Your Book</h2>
+          <p className="text-sm text-muted-foreground mb-3">
+            Let's start by creating an outline for your book. You have two options:
           </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md">
+              <span className="text-lg">🎤</span>
+              <div>
+                <div className="font-medium">Voice Input (Recommended)</div>
+                <div className="text-xs text-muted-foreground">
+                  Click "Voice Input" and describe your book idea out loud
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md">
+              <span className="text-lg">⌨️</span>
+              <div>
+                <div className="font-medium">Type Your Idea</div>
+                <div className="text-xs text-muted-foreground">
+                  Write your book concept in the text area below
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="p-6 space-y-6">
           {/* Premise Input */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium">Your Book Idea</label>
+              <label className="block text-sm font-medium">
+                <span className="inline-flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                    1
+                  </span>
+                  Your Book Idea
+                </span>
+              </label>
               <button
                 onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-                className="flex items-center gap-2 px-3 py-1 text-sm border border-input rounded-md hover:bg-accent"
+                className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${
+                  showVoiceRecorder
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-primary text-primary hover:bg-primary/10"
+                }`}
               >
                 <Mic className="w-4 h-4" />
-                Voice Input
+                {showVoiceRecorder ? "Hide Voice Recorder" : "🎤 Use Voice Input"}
               </button>
             </div>
-            <textarea
-              value={premise}
-              onChange={(e) => setPremise(e.target.value)}
-              placeholder="Example: A detective in a futuristic city uncovers a conspiracy involving AI and must decide whether to expose the truth or protect those he loves..."
-              className="w-full px-3 py-2 border border-input rounded-md bg-background resize-none"
-              rows={8}
-            />
+            {!showVoiceRecorder && (
+              <textarea
+                value={premise}
+                onChange={(e) => setPremise(e.target.value)}
+                placeholder="Example: A detective in a futuristic city uncovers a conspiracy involving AI and must decide whether to expose the truth or protect those he loves..."
+                className="w-full px-3 py-2 border border-input rounded-md bg-background resize-none"
+                rows={8}
+              />
+            )}
           </div>
 
           {/* Generate Outline Button */}
-          <div>
-            <button
-              onClick={handleGenerateOutline}
-              disabled={isGenerating || !premise.trim() || !isOnline}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Generating Outline...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5" />
-                  <span>Generate AI Outline</span>
-                </>
+          {premise.trim() && !isGenerating && generatedOutline.length === 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                  2
+                </span>
+                <span className="text-sm font-medium">Generate Your Outline</span>
+              </div>
+              <button
+                onClick={handleGenerateOutline}
+                disabled={isGenerating || !premise.trim() || !isOnline}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
+              >
+                <Sparkles className="w-5 h-5" />
+                <span>✨ Generate AI Outline from Your Idea</span>
+              </button>
+              {!isOnline && (
+                <p className="text-xs text-destructive mt-2 text-center">
+                  Offline - AI outline generation unavailable
+                </p>
               )}
-            </button>
-            {!isOnline && (
-              <p className="text-xs text-destructive mt-2 text-center">
-                Offline - AI outline generation unavailable
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                The AI will create a detailed chapter outline based on your book idea
               </p>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Generating State */}
+          {isGenerating && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="font-medium">Creating your book outline...</p>
+                <p className="text-sm text-muted-foreground">
+                  This may take a few moments
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Error Display */}
           {error && (
@@ -218,34 +265,52 @@ export function PremiseModal({ projectId }: PremiseModalProps) {
 
           {/* Generated Outline Preview */}
           {generatedOutline.length > 0 && (
-            <div className="border border-border rounded-md overflow-hidden">
-              <div className="bg-muted px-4 py-2 border-b border-border">
-                <span className="text-sm font-medium">Generated Outline</span>
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold">
+                  ✓
+                </span>
+                <span className="text-sm font-medium">Your Book Outline is Ready!</span>
               </div>
-              <div className="p-4 max-h-96 overflow-y-auto bg-background">
-                <OutlinePreview nodes={generatedOutline} />
+              <div className="border border-green-500/30 rounded-md overflow-hidden bg-green-50/50 dark:bg-green-950/20">
+                <div className="bg-green-100 dark:bg-green-900/30 px-4 py-2 border-b border-green-500/30">
+                  <span className="text-sm font-medium">Generated Chapter Outline</span>
+                </div>
+                <div className="p-4 max-h-96 overflow-y-auto bg-background">
+                  <OutlinePreview nodes={generatedOutline} />
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Review your outline above, then click "Save & Continue" to start writing
+              </p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 p-6 border-t border-border">
+        <div className="flex items-center justify-between gap-3 p-6 border-t border-border bg-muted/30">
           <button
             onClick={handleSkip}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground underline"
           >
-            Skip for now
+            Skip (I'll add chapters manually)
           </button>
-          <div className="flex gap-3">
-            <button
-              onClick={handleSaveAndContinue}
-              className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              {generatedOutline.length > 0
-                ? "Save Premise & Outline"
-                : "Save Premise"}
-            </button>
-          </div>
+          <button
+            onClick={handleSaveAndContinue}
+            disabled={!premise.trim()}
+            className="px-8 py-3 text-base font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {generatedOutline.length > 0 ? (
+              <>
+                <span>📝 Save & Start Writing</span>
+                <span className="text-xs opacity-75">→</span>
+              </>
+            ) : (
+              <>
+                <span>Continue</span>
+                <span className="text-xs opacity-75">→</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
