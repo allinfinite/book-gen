@@ -76,6 +76,14 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
               // Fix missing opening quotes on property names
               jsonContent = jsonContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(":\s*)/g, '$1"$2$3');
               
+              // Fix missing closing quotes before commas or next property
+              // Pattern: "key": "value    "nextKey" -> "key": "value",    "nextKey"
+              jsonContent = jsonContent.replace(/"\s+"/g, '",\n    "');
+              
+              // Fix missing commas between properties
+              // Pattern: "value"    "nextKey": -> "value",    "nextKey":
+              jsonContent = jsonContent.replace(/("\s+)([a-zA-Z_][a-zA-Z0-9_]*":\s*)/g, '",\n    $2');
+              
               // Try to fix truncated JSON by closing open brackets
               const openBrackets = (jsonContent.match(/\[/g) || []).length;
               const closeBrackets = (jsonContent.match(/\]/g) || []).length;

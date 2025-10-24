@@ -51,7 +51,32 @@ Rules:
 - Return ONLY valid JSON, no explanatory text, no markdown code fences
 - Start your response with [ and end with ]
 - Do not include any text before or after the JSON array
-- Ensure all property names have opening AND closing quotes`;
+- Ensure all property names have opening AND closing quotes
+- Every string value MUST be properly closed with quotes before comma or closing brace
+- Pay careful attention to proper quote placement: "key": "value", not "key": "value    "key2"
+
+Example format:
+[
+  {
+    "id": "uuid-1",
+    "type": "part",
+    "title": "Part I: The Beginning",
+    "children": [
+      {
+        "id": "uuid-2",
+        "type": "chapter",
+        "title": "First Steps",
+        "children": [
+          {
+            "id": "uuid-3",
+            "type": "section",
+            "title": "Opening scene"
+          }
+        ]
+      }
+    ]
+  }
+]`;
 
   const user = `Premise: ${project.premise || ""}
 
