@@ -59,15 +59,14 @@ export function VoiceRecorder({
   async function handleStartRecording() {
     try {
       setError(null);
+      // Use simple audio constraints - browser will use defaults
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1, // Mono
-          sampleRate: 48000, // High quality sample rate
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: true,
       });
+
+      console.log("Got media stream, tracks:", stream.getAudioTracks().length);
+      const audioTrack = stream.getAudioTracks()[0];
+      console.log("Audio track settings:", audioTrack.getSettings());
 
       // Set up audio visualization
       const audioContext = new AudioContext();
@@ -122,6 +121,13 @@ export function VoiceRecorder({
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
         audioBitsPerSecond: 128000, // Higher quality
+      });
+
+      console.log("MediaRecorder created:", {
+        mimeType,
+        state: mediaRecorder.state,
+        streamActive: stream.active,
+        audioTracksEnabled: stream.getAudioTracks()[0].enabled,
       });
 
       mediaRecorderRef.current = mediaRecorder;
