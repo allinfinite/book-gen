@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+@theme {
+  --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(15% 0 0);
+
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(15% 0 0);
+
+  --color-popover: oklch(100% 0 0);
+  --color-popover-foreground: oklch(15% 0 0);
+
+  --color-primary: oklch(49% 0.15 270);
+  --color-primary-foreground: oklch(99% 0 0);
+
+  --color-secondary: oklch(96% 0 0);
+  --color-secondary-foreground: oklch(15% 0 0);
+
+  --color-muted: oklch(96% 0 0);
+  --color-muted-foreground: oklch(45% 0 0);
+
+  --color-accent: oklch(96% 0 0);
+  --color-accent-foreground: oklch(15% 0 0);
+
+  --color-destructive: oklch(58% 0.23 29);
+  --color-destructive-foreground: oklch(99% 0 0);
+
+  --color-border: oklch(90% 0 0);
+  --color-input: oklch(90% 0 0);
+  --color-ring: oklch(49% 0.15 270);
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --color-background: oklch(15% 0 0);
+  --color-foreground: oklch(99% 0 0);
+
+  --color-card: oklch(15% 0 0);
+  --color-card-foreground: oklch(99% 0 0);
+
+  --color-popover: oklch(15% 0 0);
+  --color-popover-foreground: oklch(99% 0 0);
+
+  --color-primary: oklch(69% 0.15 270);
+  --color-primary-foreground: oklch(10% 0 0);
+
+  --color-secondary: oklch(25% 0 0);
+  --color-secondary-foreground: oklch(99% 0 0);
+
+  --color-muted: oklch(25% 0 0);
+  --color-muted-foreground: oklch(65% 0 0);
+
+  --color-accent: oklch(25% 0 0);
+  --color-accent-foreground: oklch(99% 0 0);
+
+  --color-destructive: oklch(64% 0.22 29);
+  --color-destructive-foreground: oklch(99% 0 0);
+
+  --color-border: oklch(25% 0 0);
+  --color-input: oklch(25% 0 0);
+  --color-ring: oklch(69% 0.15 270);
+}
+
+* {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+body {
+  font-family: var(--font-family-base);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+  padding: 1rem;
+  min-height: 300px;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 1.5rem 0 1rem;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 1.25rem 0 0.75rem;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem;
+}
+
+.ProseMirror p {
+  margin: 0.75rem 0;
+  line-height: 1.7;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+}
+
+.ProseMirror code {
+  background-color: hsl(var(--muted));
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+}
+
+.ProseMirror pre {
+  background-color: hsl(var(--muted));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
