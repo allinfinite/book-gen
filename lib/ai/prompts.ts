@@ -36,47 +36,45 @@ Book Details:
 - Audience: ${project.targets?.audience || "General"}
 - Language: ${project.meta?.language || "en"}
 
-Task: Produce a hierarchical outline as a JSON array of OutlineNode objects. Each node has:
+Task: Produce a hierarchical outline. Return a JSON object with an "outline" key containing an array of OutlineNode objects. Each node has:
 {
   id: string (UUID),
   type: "part" | "chapter" | "section",
   title: string,
-  children?: OutlineNode[]
+  children: OutlineNode[]
 }
 
 Rules:
 - For fiction: escalating stakes, end-of-chapter hooks, avoid redundancy
 - For nonfiction: logical progression, clear learning objectives
 - Keep titles concise and clear (under 60 characters each)
-- Return ONLY valid JSON, no explanatory text, no markdown code fences
-- Start your response with [ and end with ]
-- Do not include any text before or after the JSON array
-- Ensure all property names have opening AND closing quotes
-- Every string value MUST be properly closed with quotes before comma or closing brace
-- Pay careful attention to proper quote placement: "key": "value", not "key": "value    "key2"
+- Return ONLY valid JSON in the exact format specified
+- Use the structured output format provided
 
 Example format:
-[
-  {
-    "id": "uuid-1",
-    "type": "part",
-    "title": "Part I: The Beginning",
-    "children": [
-      {
-        "id": "uuid-2",
-        "type": "chapter",
-        "title": "First Steps",
-        "children": [
-          {
-            "id": "uuid-3",
-            "type": "section",
-            "title": "Opening scene"
-          }
-        ]
-      }
-    ]
-  }
-]`;
+{
+  "outline": [
+    {
+      "id": "uuid-1",
+      "type": "part",
+      "title": "Part I: The Beginning",
+      "children": [
+        {
+          "id": "uuid-2",
+          "type": "chapter",
+          "title": "First Steps",
+          "children": [
+            {
+              "id": "uuid-3",
+              "type": "section",
+              "title": "Opening scene"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}`;
 
   const user = `Premise: ${project.premise || ""}
 
@@ -205,13 +203,7 @@ ${preset?.constraints?.length ? `- Constraints: ${preset.constraints.join(", ")}
 Targets:
 ${targets?.minSectionWords ? `- Section words: ${targets.minSectionWords}–${targets.maxSectionWords}` : "- Aim for substantial section content (300-800 words each)"}
 
-Task: Generate an array of sections with FULL CONTENT (not just titles). Return JSON array of objects:
-[
-  {
-    "title": "Section title",
-    "content": "Full section content in markdown format..."
-  }
-]
+Task: Generate sections with FULL CONTENT (not just titles). Return a JSON object with a "sections" key containing an array of section objects.
 
 Rules:
 - Generate 3-6 sections for the chapter
@@ -219,23 +211,24 @@ Rules:
 - Match genre conventions and audience expectations
 - Keep continuity and logical flow between sections
 - Stay strictly within style lock (POV, tense, voice)
-- Return ONLY valid JSON, no explanatory text, no markdown code fences
-- Start your response with [ and end with ]
+- Return ONLY valid JSON in the exact format specified
+- Use the structured output format provided
 - Every section MUST have both "title" and "content" fields
 - Content should be substantial prose, not outlines or placeholders
-- Ensure all property names and string values are properly quoted
 
 Example format:
-[
-  {
-    "title": "Opening Scene",
-    "content": "The morning sun crept through the blinds, painting golden stripes across the hardwood floor. Sarah hadn't slept. She sat at her kitchen table..."
-  },
-  {
-    "title": "The Discovery",
-    "content": "Three hours later, Sarah stood in front of the old bookstore on Fifth Avenue. The faded sign read 'Antiquarian Books & Curiosities'..."
-  }
-]`;
+{
+  "sections": [
+    {
+      "title": "Opening Scene",
+      "content": "The morning sun crept through the blinds, painting golden stripes across the hardwood floor. Sarah hadn't slept. She sat at her kitchen table..."
+    },
+    {
+      "title": "The Discovery",
+      "content": "Three hours later, Sarah stood in front of the old bookstore on Fifth Avenue. The faded sign read 'Antiquarian Books & Curiosities'..."
+    }
+  ]
+}`;
 
   const user = `Book premise: ${project.premise || ""}
 

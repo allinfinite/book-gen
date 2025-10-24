@@ -51,81 +51,21 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
             setRawResponse(fullContent); // Store raw response for debugging
             
             try {
-              // Extract JSON from the response (handle markdown code fences)
-              let jsonContent = fullContent.trim();
+              // Parse the structured JSON response
+              const parsed = JSON.parse(fullContent.trim());
               
-              // Remove markdown code fences if present
-              if (jsonContent.startsWith("```")) {
-                const lines = jsonContent.split("\n");
-                // Remove first line (```json or ```)
-                lines.shift();
-                // Remove last line if it's ```
-                if (lines[lines.length - 1].trim() === "```") {
-                  lines.pop();
-                }
-                jsonContent = lines.join("\n").trim();
-              }
-              
-              // Try to extract JSON array if there's text before/after
-              const arrayMatch = jsonContent.match(/\[\s*\{[\s\S]*\}\s*\]/);
-              if (arrayMatch) {
-                jsonContent = arrayMatch[0];
-              }
-              
-              // Fix common JSON issues more aggressively
-              // 1. Fix missing opening quotes on property names: prop": -> "prop":
-              jsonContent = jsonContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(":\s*)/g, '$1"$2$3');
-              
-              // 2. Fix unquoted values: ":section" -> ": "section"
-              // Match colon, optional space, unquoted word, then comma or closing brace
-              jsonContent = jsonContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]+)([",}\]])/g, ': "$1"$2');
-              
-              // 3. Fix missing colon: "key" "value" -> "key": "value"
-              // Match quote-space-quote pattern at property boundaries
-              jsonContent = jsonContent.replace(/"(\w+)"\s+"([^"]+)"/g, '"$1": "$2"');
-              
-              // Fix missing closing quotes before commas or next property
-              // Pattern: "key": "value    "nextKey" -> "key": "value",    "nextKey"
-              jsonContent = jsonContent.replace(/"\s+"/g, '",\n    "');
-              
-              // Fix missing commas between properties
-              // Pattern: "value"    "nextKey": -> "value",    "nextKey":
-              jsonContent = jsonContent.replace(/("\s+)([a-zA-Z_][a-zA-Z0-9_]*":\s*)/g, '",\n    $2');
-              
-              // Try to fix truncated JSON by closing open brackets
-              const openBrackets = (jsonContent.match(/\[/g) || []).length;
-              const closeBrackets = (jsonContent.match(/\]/g) || []).length;
-              const openBraces = (jsonContent.match(/\{/g) || []).length;
-              const closeBraces = (jsonContent.match(/\}/g) || []).length;
-              
-              if (openBraces > closeBraces || openBrackets > closeBrackets) {
-                // Truncated JSON - try to close it
-                console.warn("JSON appears truncated, attempting to close open brackets");
-                let fixed = jsonContent;
-                // Close open objects
-                for (let i = 0; i < (openBraces - closeBraces); i++) {
-                  fixed += "}";
-                }
-                // Close open arrays
-                for (let i = 0; i < (openBrackets - closeBrackets); i++) {
-                  fixed += "]";
-                }
-                jsonContent = fixed;
-              }
-              
-              // Parse the JSON outline
-              const parsed = JSON.parse(jsonContent);
-              if (Array.isArray(parsed)) {
-                setGeneratedOutline(parsed);
+              // Extract outline from structured response
+              if (parsed && parsed.outline && Array.isArray(parsed.outline)) {
+                setGeneratedOutline(parsed.outline);
                 setError(null);
               } else {
-                setError("Invalid outline format received - expected an array of chapters");
+                setError("Invalid outline format received from AI");
               }
-              } catch (e) {
-                console.error("Failed to parse outline:", e);
-                console.error("Raw content:", fullContent);
-                setError("Failed to parse outline. The AI returned invalid or incomplete JSON. Try regenerating. (Note: GPT-5 can be less reliable with JSON. Consider using OPENAI_MODEL=gpt-4o in your .env for more reliable results.)");
-              }
+            } catch (e) {
+              console.error("Failed to parse outline:", e);
+              console.error("Raw content:", fullContent);
+              setError(`Failed to parse outline: ${e instanceof Error ? e.message : "Unknown error"}`);
+            }
             setIsGenerating(false);
           },
           onError: (err) => {

@@ -76,67 +76,20 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
           setRawResponse(fullContent);
           
           try {
-            let jsonContent = fullContent.trim();
+            // Parse the structured JSON response
+            const parsed = JSON.parse(fullContent.trim());
             
-            // Strip markdown code fences
-            if (jsonContent.startsWith("```")) {
-              const lines = jsonContent.split("\n");
-              lines.shift();
-              if (lines[lines.length - 1].trim() === "```") {
-                lines.pop();
-              }
-              jsonContent = lines.join("\n").trim();
-            }
-            
-            // Extract JSON array if surrounded by text
-            const arrayMatch = jsonContent.match(/\[\s*\{[\s\S]*\}\s*\]/);
-            if (arrayMatch) {
-              jsonContent = arrayMatch[0];
-            }
-            
-            // Fix common JSON issues more aggressively
-            // 1. Fix missing opening quotes on property names
-            jsonContent = jsonContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(":\s*)/g, '$1"$2$3');
-            
-            // 2. Fix unquoted values after colon
-            jsonContent = jsonContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]+)([",}\]])/g, ': "$1"$2');
-            
-            // 3. Fix missing colon between property and value
-            jsonContent = jsonContent.replace(/"(\w+)"\s+"([^"]+)"/g, '"$1": "$2"');
-            
-            // 4. Fix missing closing quotes and commas
-            jsonContent = jsonContent.replace(/"\s+"/g, '",\n    "');
-            jsonContent = jsonContent.replace(/("\s+)([a-zA-Z_][a-zA-Z0-9_]*":\s*)/g, '",\n    $2');
-            
-            // Try to fix truncated JSON
-            const openBrackets = (jsonContent.match(/\[/g) || []).length;
-            const closeBrackets = (jsonContent.match(/\]/g) || []).length;
-            const openBraces = (jsonContent.match(/\{/g) || []).length;
-            const closeBraces = (jsonContent.match(/\}/g) || []).length;
-            
-            if (openBraces > closeBraces || openBrackets > closeBrackets) {
-              console.warn("JSON appears truncated, attempting to close open brackets");
-              let fixed = jsonContent;
-              for (let i = 0; i < (openBraces - closeBraces); i++) {
-                fixed += "}";
-              }
-              for (let i = 0; i < (openBrackets - closeBrackets); i++) {
-                fixed += "]";
-              }
-              jsonContent = fixed;
-            }
-            
-            const parsed = JSON.parse(jsonContent);
-            if (Array.isArray(parsed)) {
-              setGeneratedSections(parsed);
+            // Extract sections from structured response
+            if (parsed && parsed.sections && Array.isArray(parsed.sections)) {
+              setGeneratedSections(parsed.sections);
               setError(null);
             } else {
-              setError("Invalid format - expected an array of sections");
+              setError("Invalid format received from AI");
             }
           } catch (e) {
             console.error("Failed to parse sections:", e);
             console.error("Raw content:", fullContent);
-            setError("Failed to parse AI response. Try regenerating. (Note: GPT-5 can be less reliable with JSON. Consider using OPENAI_MODEL=gpt-4o in your .env for more reliable results.)");
+            setError(`Failed to parse AI response: ${e instanceof Error ? e.message : "Unknown error"}`);
           }
           setIsGenerating(false);
         },

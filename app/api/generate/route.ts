@@ -63,12 +63,67 @@ export async function POST(req: NextRequest) {
     // Build prompts based on task
     let systemPrompt: string;
     let userPrompt: string;
+    let responseFormat: any = undefined; // JSON schema for structured outputs
 
     switch (task) {
       case "outline":
         const outlinePrompts = buildOutlinePrompt(project, userBrief);
         systemPrompt = outlinePrompts.system;
         userPrompt = outlinePrompts.user;
+        // Use structured output for reliable JSON
+        responseFormat = {
+          type: "json_schema",
+          json_schema: {
+            name: "book_outline",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                outline: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      type: { type: "string", enum: ["part", "chapter"] },
+                      title: { type: "string" },
+                      children: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string" },
+                            type: { type: "string", enum: ["chapter", "section"] },
+                            title: { type: "string" },
+                            children: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string" },
+                                  type: { type: "string", enum: ["section"] },
+                                  title: { type: "string" }
+                                },
+                                required: ["id", "type", "title"],
+                                additionalProperties: false
+                              }
+                            }
+                          },
+                          required: ["id", "type", "title", "children"],
+                          additionalProperties: false
+                        }
+                      }
+                    },
+                    required: ["id", "type", "title", "children"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ["outline"],
+              additionalProperties: false
+            }
+          }
+        };
         break;
 
       case "revise_outline":
@@ -118,6 +173,33 @@ export async function POST(req: NextRequest) {
         );
         systemPrompt = sectionsPrompts.system;
         userPrompt = sectionsPrompts.user;
+        // Use structured output for reliable JSON
+        responseFormat = {
+          type: "json_schema",
+          json_schema: {
+            name: "chapter_sections",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                sections: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      title: { type: "string" },
+                      content: { type: "string" }
+                    },
+                    required: ["title", "content"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ["sections"],
+              additionalProperties: false
+            }
+          }
+        };
         break;
 
       case "rewrite":
@@ -168,6 +250,8 @@ export async function POST(req: NextRequest) {
         }),
         max_completion_tokens: controls?.maxTokens ?? MAX_COMPLETION_TOKENS,
         stream: true,
+        // Add structured output format if specified
+        ...(responseFormat && { response_format: responseFormat }),
       }),
     });
 
