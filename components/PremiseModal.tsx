@@ -93,8 +93,61 @@ export function PremiseModal({ projectId }: PremiseModalProps) {
   }
 
   function handleVoiceTranscription(text: string) {
-    setPremise((prev) => (prev ? prev + " " + text : text));
+    const newPremise = text; // Use transcription as the premise directly
+    setPremise(newPremise);
     setShowVoiceRecorder(false);
+
+    // Automatically generate outline from voice transcription
+    if (newPremise.trim() && currentProject && isOnline) {
+      // Wait a moment for state to update, then generate
+      setTimeout(() => {
+        handleGenerateOutlineFromPremise(newPremise);
+      }, 100);
+    }
+  }
+
+  async function handleGenerateOutlineFromPremise(premiseText: string) {
+    setIsGenerating(true);
+    setError(null);
+    setGeneratedOutline([]);
+
+    let fullContent = "";
+
+    try {
+      await streamGenerate(
+        {
+          task: "outline",
+          project: { ...currentProject!, premise: premiseText },
+        },
+        {
+          onContent: (content) => {
+            fullContent += content;
+          },
+          onComplete: () => {
+            try {
+              // Parse the JSON outline
+              const parsed = JSON.parse(fullContent);
+              if (Array.isArray(parsed)) {
+                setGeneratedOutline(parsed);
+                setError(null);
+              } else {
+                setError("Invalid outline format received");
+              }
+            } catch (e) {
+              setError("Failed to parse outline");
+            }
+            setIsGenerating(false);
+          },
+          onError: (err) => {
+            setError(err);
+            setIsGenerating(false);
+          },
+        }
+      );
+    } catch (err: any) {
+      setError(err.message);
+      setIsGenerating(false);
+    }
   }
 
   return (

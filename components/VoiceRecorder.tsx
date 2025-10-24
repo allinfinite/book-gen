@@ -195,18 +195,6 @@ export function VoiceRecorder({
     setIsTranscribing(true);
     console.log("Starting transcription...", audioBlob.size, "bytes");
 
-    // Download the audio file for debugging
-    const url = URL.createObjectURL(audioBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `recording-${Date.now()}.webm`;
-    console.log("Audio blob download link created. Click to download:", a.download);
-    // Automatically trigger download for debugging
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
