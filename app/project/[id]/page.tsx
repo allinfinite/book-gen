@@ -9,7 +9,7 @@ import { ChapterEditor } from "@/components/ChapterEditor";
 import { AISidebar } from "@/components/AISidebar";
 import { GenerateOutlineModal } from "@/components/GenerateOutlineModal";
 import { BookSettingsModal } from "@/components/BookSettingsModal";
-import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown, Settings } from "lucide-react";
+import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown, Settings, ChevronRight } from "lucide-react";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -41,6 +41,7 @@ export default function ProjectPage() {
   const [showAddChapterMenu, setShowAddChapterMenu] = useState(false);
   const [showGenerateOutlineModal, setShowGenerateOutlineModal] = useState(false);
   const [showBookSettings, setShowBookSettings] = useState(false);
+  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (projectId) {
@@ -85,6 +86,32 @@ export default function ProjectPage() {
   function handleGenerateOutline() {
     setShowGenerateOutlineModal(true);
     setShowAddChapterMenu(false);
+  }
+
+  function toggleChapterExpansion(chapterId: string) {
+    setExpandedChapters((prev) => {
+      const next = new Set(prev);
+      if (next.has(chapterId)) {
+        next.delete(chapterId);
+      } else {
+        next.add(chapterId);
+      }
+      return next;
+    });
+  }
+
+  function scrollToSection(sectionTitle: string) {
+    // Find the section heading in the editor and scroll to it
+    const editorElement = document.querySelector('.chapter-editor');
+    if (!editorElement) return;
+    
+    const headings = editorElement.querySelectorAll('h2, h3');
+    for (const heading of headings) {
+      if (heading.textContent?.includes(sectionTitle)) {
+        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        break;
+      }
+    }
   }
 
   async function handleSaveChapter() {
@@ -316,43 +343,92 @@ export default function ProjectPage() {
                   No chapters yet
                 </p>
               ) : (
-                currentProject.chapters.map((chapter, idx) => (
-                  <div
-                    key={chapter.id}
-                    className={`p-3 rounded-md transition-colors relative group ${
-                      selectedChapterId === chapter.id
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted hover:bg-muted/80"
-                    }`}
-                  >
-                    <div
-                      onClick={() => setSelectedChapter(chapter.id)}
-                      className="cursor-pointer"
-                    >
-                      <div className="text-sm font-medium pr-8">
-                        Chapter {idx + 1}: {chapter.title}
+                currentProject.chapters.map((chapter, idx) => {
+                  const isExpanded = expandedChapters.has(chapter.id);
+                  const isSelected = selectedChapterId === chapter.id;
+                  
+                  return (
+                    <div key={chapter.id} className="space-y-1">
+                      <div
+                        className={`rounded-md transition-colors relative group ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted hover:bg-muted/80"
+                        }`}
+                      >
+                        <div className="flex items-start gap-1 p-3 pr-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleChapterExpansion(chapter.id);
+                            }}
+                            className="p-0.5 hover:bg-background/10 rounded transition-colors mt-0.5"
+                            title={isExpanded ? "Collapse sections" : "Expand sections"}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </button>
+                          <div
+                            onClick={() => setSelectedChapter(chapter.id)}
+                            className="cursor-pointer flex-1"
+                          >
+                            <div className="text-sm font-medium">
+                              Chapter {idx + 1}: {chapter.title}
+                            </div>
+                            <div className="text-xs opacity-75 mt-1">
+                              {chapter.sections.length} sections • {chapter.status}
+                            </div>
+                            {chapter.wordCount && (
+                              <div className="text-xs opacity-75 mt-1">
+                                {chapter.wordCount} words
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteChapter(chapter.id);
+                          }}
+                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-opacity"
+                          title="Delete chapter"
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </button>
                       </div>
-                      <div className="text-xs opacity-75 mt-1">
-                        {chapter.sections.length} sections • {chapter.status}
-                      </div>
-                      {chapter.wordCount && (
-                        <div className="text-xs opacity-75 mt-1">
-                          {chapter.wordCount} words
+                      
+                      {/* Nested Sections */}
+                      {isExpanded && chapter.sections.length > 0 && (
+                        <div className="ml-6 space-y-1">
+                          {chapter.sections.map((section, sectionIdx) => (
+                            <button
+                              key={section.id}
+                              onClick={() => {
+                                setSelectedChapter(chapter.id);
+                                setTimeout(() => scrollToSection(section.title), 100);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
+                                isSelected
+                                  ? "bg-primary/20 hover:bg-primary/30"
+                                  : "bg-muted/50 hover:bg-muted"
+                              }`}
+                            >
+                              <div className="font-medium">{section.title}</div>
+                              {section.content && (
+                                <div className="text-muted-foreground mt-0.5">
+                                  {section.content.split(/\s+/).length} words
+                                </div>
+                              )}
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteChapter(chapter.id);
-                      }}
-                      className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-opacity"
-                      title="Delete chapter"
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </button>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
