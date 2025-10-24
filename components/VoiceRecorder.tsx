@@ -17,11 +17,15 @@ export function VoiceRecorder({
     useUIStore();
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Keyboard shortcut: R key
@@ -45,6 +49,32 @@ export function VoiceRecorder({
       setError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
+      // Set up audio visualization
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      // Start visualization
+      const updateLevel = () => {
+        if (!analyserRef.current) return;
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        setAudioLevel(average / 255); // Normalize to 0-1
+
+        if (isRecording) {
+          animationFrameRef.current = requestAnimationFrame(updateLevel);
+        }
+      };
+      updateLevel();
+
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: "audio/webm;codecs=opus",
       });
@@ -60,6 +90,15 @@ export function VoiceRecorder({
 
       mediaRecorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+
+        // Clean up audio context
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+        }
+
         await transcribeAudio(blob);
 
         // Stop all tracks
@@ -132,12 +171,46 @@ export function VoiceRecorder({
           </div>
         )}
 
+        {/* Waveform Visualization */}
+        {isRecording && (
+          <div className="bg-card border border-border rounded-lg px-4 py-3 shadow-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+              <span className="text-sm font-medium">Recording...</span>
+            </div>
+            <div className="flex items-center gap-1 h-12">
+              {Array.from({ length: 20 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1 bg-primary rounded-full transition-all duration-75"
+                  style={{
+                    height: `${Math.max(4, audioLevel * 48 * (Math.random() * 0.5 + 0.5))}px`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Transcribing Status */}
+        {isTranscribing && (
+          <div className="bg-card border border-border rounded-lg px-4 py-3 shadow-lg">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="text-sm font-medium">Transcribing audio...</span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              This may take a few seconds
+            </div>
+          </div>
+        )}
+
         <button
           onClick={isRecording ? handleStopRecording : handleStartRecording}
           disabled={isTranscribing}
           className={`flex items-center gap-2 px-6 py-4 rounded-full shadow-lg transition-all ${
             isRecording
-              ? "bg-destructive text-destructive-foreground animate-pulse"
+              ? "bg-destructive text-destructive-foreground"
               : "bg-primary text-primary-foreground hover:bg-primary/90"
           } ${isTranscribing ? "opacity-50 cursor-not-allowed" : ""}`}
           title="Press Cmd/Ctrl+R to toggle recording"
@@ -145,23 +218,23 @@ export function VoiceRecorder({
           {isTranscribing ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Transcribing...</span>
+              <span>Processing...</span>
             </>
           ) : isRecording ? (
             <>
               <Square className="w-5 h-5" />
-              <span>Stop Recording</span>
+              <span>Stop</span>
             </>
           ) : (
             <>
               <Mic className="w-5 h-5" />
-              <span>Start Recording</span>
+              <span>Record</span>
             </>
           )}
         </button>
 
         {isRecording && (
-          <div className="text-sm text-muted-foreground bg-card px-3 py-1 rounded-md border border-border">
+          <div className="text-xs text-muted-foreground bg-card px-3 py-1 rounded-md border border-border">
             Press Cmd/Ctrl+R to stop
           </div>
         )}
