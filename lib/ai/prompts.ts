@@ -73,6 +73,10 @@ export function buildChapterDraftPrompt(
 
   const system = `You are a senior author collaborating with the user. You MUST obey the style lock strictly.
 
+Book Type:
+- Genre: ${project.meta?.genre || "General"}
+- Audience: ${targets?.audience || "General"}
+
 Style Lock (ENFORCE STRICTLY):
 - POV: ${preset?.pov}
 - Tense: ${preset?.tense}
@@ -85,6 +89,7 @@ ${targets?.minSectionWords ? `- Section words: ${targets.minSectionWords}–${ta
 
 Rules:
 - Draft in Markdown with H2 (##) for section headings
+- Match genre conventions and audience expectations
 - Keep continuity with prior chapters
 - Avoid recap unless necessary
 - Fit within word targets
@@ -119,6 +124,10 @@ export function buildSectionDraftPrompt(
 
   const system = `You are a section writer. You MUST obey the style lock and targets.
 
+Book Type:
+- Genre: ${project.meta?.genre || "General"}
+- Audience: ${targets?.audience || "General"}
+
 Style Lock:
 - POV: ${preset?.pov}
 - Tense: ${preset?.tense}
@@ -128,7 +137,7 @@ ${preset?.constraints?.length ? `- Constraints: ${preset.constraints.join(", ")}
 Target:
 ${targets?.minSectionWords ? `- Section words: ${targets.minSectionWords}–${targets.maxSectionWords}` : "- Aim for substantial section content"}
 
-Task: Draft a single section in Markdown. No heading needed (it will be added separately).`;
+Task: Draft a single section in Markdown. No heading needed (it will be added separately). Match genre conventions.`;
 
   const user = `Chapter: ${chapter?.title || "Untitled"}
 ${chapter?.synopsis ? `Chapter synopsis: ${chapter.synopsis}` : ""}
@@ -157,6 +166,10 @@ export function buildRewritePrompt(
 
   const system = `You are an editor. Operation: ${operation}. You MUST obey the style lock and preserve facts/continuity.
 
+Book Type:
+- Genre: ${project.meta?.genre || "General"}
+- Audience: ${project.targets?.audience || "General"}
+
 Style Lock:
 - POV: ${preset?.pov}
 - Tense: ${preset?.tense}
@@ -165,7 +178,7 @@ ${preset?.constraints?.length ? `- Constraints: ${preset.constraints.join(", ")}
 
 Task: ${operationInstructions[operation]}
 
-Output: Revised Markdown ONLY. No explanations.`;
+Output: Revised Markdown ONLY. No explanations. Maintain genre conventions.`;
 
   const user = `<<<\n${excerpt}\n>>>
 

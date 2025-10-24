@@ -8,7 +8,8 @@ import { Chapter } from "@/types/book";
 import { ChapterEditor } from "@/components/ChapterEditor";
 import { AISidebar } from "@/components/AISidebar";
 import { GenerateOutlineModal } from "@/components/GenerateOutlineModal";
-import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown } from "lucide-react";
+import { BookSettingsModal } from "@/components/BookSettingsModal";
+import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown, Settings } from "lucide-react";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -39,6 +40,7 @@ export default function ProjectPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showAddChapterMenu, setShowAddChapterMenu] = useState(false);
   const [showGenerateOutlineModal, setShowGenerateOutlineModal] = useState(false);
+  const [showBookSettings, setShowBookSettings] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -199,6 +201,14 @@ export default function ProjectPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowBookSettings(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-accent"
+              title="Book Settings"
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
             <button
               onClick={toggleAISidebar}
               className={`flex items-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-accent ${
@@ -408,6 +418,12 @@ export default function ProjectPage() {
       <GenerateOutlineModal
         isOpen={showGenerateOutlineModal}
         onClose={() => setShowGenerateOutlineModal(false)}
+      />
+
+      {/* Book Settings Modal */}
+      <BookSettingsModal
+        isOpen={showBookSettings}
+        onClose={() => setShowBookSettings(false)}
       />
     </div>
   );

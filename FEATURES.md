@@ -4,7 +4,7 @@
 
 ### 🎯 Core Workflow
 
-#### 1. Project Creation
+#### 1. Project Creation & Settings
 - **New Project Modal** with comprehensive setup
   - Title, subtitle, author name
   - Genre selection (18 options)
@@ -12,6 +12,13 @@
   - Book structure presets (7 options)
   - Style lock selection (5 presets)
   - Word count targets (chapter and section min/max)
+
+- **Book Settings Modal** (editable anytime)
+  - Update all project details after creation
+  - Change genre, audience, and style presets
+  - Adjust word count targets
+  - Accessible via "Settings" button in project header
+  - All changes immediately apply to future AI generation
 
 #### 2. Premise & Outline Generation
 - **Premise Input** with voice or text
@@ -136,6 +143,12 @@
 
 ### Available AI Tasks
 
+**All AI tasks automatically use your book settings:**
+- ✅ **Genre** (enforces genre conventions)
+- ✅ **Audience** (adjusts complexity and tone)
+- ✅ **Style Lock** (POV, tense, voice, constraints)
+- ✅ **Word Count Targets** (aims for specified ranges)
+
 1. **Outline Generation**
    - Input: Premise, genre, audience, structure
    - Output: Hierarchical JSON outline
@@ -145,16 +158,18 @@
    - Input: Chapter title, brief, context
    - Output: Streaming Markdown content
    - Includes prior chapter summaries
-   - Enforces word count targets
+   - Matches genre conventions and audience level
+   - Enforces word count targets and style lock
 
 3. **Section Drafting** (API ready)
    - Input: Section title and intent
    - Output: Single section content
+   - Genre-aware and style-locked
    - Respects section word targets
 
 4. **Content Rewriting** (API ready)
    - Operations: Clarify, condense, expand, adjust tone
-   - Maintains style lock
+   - Maintains style lock and genre conventions
    - Preserves facts and continuity
 
 5. **Style Check** (API ready)
