@@ -308,7 +308,11 @@ export default function ProjectPage() {
               </span>
             )}
             <button
-              onClick={handleSaveChapter}
+              onClick={async () => {
+                setIsSaving(true);
+                await handleSaveSection();
+                setIsSaving(false);
+              }}
               disabled={isSaving}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
             >
