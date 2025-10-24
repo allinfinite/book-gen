@@ -58,15 +58,38 @@ export function VoiceRecorder({
   async function handleStartRecording() {
     try {
       setError(null);
+
+      // List available audio devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioDevices = devices.filter(device => device.kind === 'audioinput');
+      console.log("Available audio input devices:", audioDevices.map(d => ({
+        deviceId: d.deviceId,
+        label: d.label,
+        groupId: d.groupId
+      })));
+
       // Use simple audio constraints - browser will use defaults
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
       });
 
       streamRef.current = stream;
       console.log("Got media stream, tracks:", stream.getAudioTracks().length);
       const audioTrack = stream.getAudioTracks()[0];
       console.log("Audio track settings:", audioTrack.getSettings());
+      console.log("Audio track label:", audioTrack.label);
+
+      // Test: Create an audio element to verify stream has audio
+      const audio = new Audio();
+      audio.srcObject = stream;
+      audio.muted = true; // Mute to avoid feedback
+      audio.volume = 0;
+      await audio.play().catch(e => console.error("Audio play test failed:", e));
+      console.log("Audio element test: playing stream (muted)");
 
       // DON'T set up audio visualization for now - it interferes with MediaRecorder
       // The AudioContext analyser can consume the stream and prevent MediaRecorder from working
