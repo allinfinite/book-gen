@@ -59,7 +59,15 @@ export function VoiceRecorder({
   async function handleStartRecording() {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1, // Mono
+          sampleRate: 48000, // High quality sample rate
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
       // Set up audio visualization
       const audioContext = new AudioContext();
@@ -128,8 +136,8 @@ export function VoiceRecorder({
       };
 
       // Start recording with time slice to ensure we capture all data
-      mediaRecorder.start(100); // Capture data every 100ms
-      console.log("Recording started with 100ms time slice");
+      mediaRecorder.start(1000); // Capture data every 1000ms (1 second)
+      console.log("Recording started with 1000ms time slice");
       startRecording();
       startTimeRef.current = Date.now();
 
@@ -149,6 +157,12 @@ export function VoiceRecorder({
     if (mediaRecorderRef.current && isRecording) {
       const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
       console.log("Stopping recording. Duration:", duration, "seconds");
+
+      // Request final data before stopping
+      if (mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.requestData();
+      }
+
       mediaRecorderRef.current.stop();
       stopRecording();
 

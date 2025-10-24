@@ -41,6 +41,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("Transcribing audio:", {
+      size: audio.size,
+      type: audio.type,
+      name: audio.name,
+    });
+
     const startTime = Date.now();
 
     // Call OpenAI Whisper API
@@ -50,6 +56,8 @@ export async function POST(req: NextRequest) {
     if (language) {
       whisperFormData.append("language", language);
     }
+    // Add prompt to help with context
+    whisperFormData.append("prompt", "This is a dictation for writing a book chapter.");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
@@ -70,6 +78,12 @@ export async function POST(req: NextRequest) {
 
     const result = await response.json();
     const durationMs = Date.now() - startTime;
+
+    console.log("Transcription result:", {
+      textLength: result.text?.length || 0,
+      text: result.text,
+      durationMs,
+    });
 
     return NextResponse.json({
       text: result.text,
