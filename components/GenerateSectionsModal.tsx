@@ -56,19 +56,23 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
     let fullContent = "";
 
     try {
-      await streamGenerate({
-        project: currentProject,
-        task: "sections",
-        context: {
-          chapterTitle: chapter.title,
-          chapterSynopsis: chapter.synopsis || "",
-          existingSections: chapter.sections.map((s) => s.title),
-          userBrief: brief,
+      await streamGenerate(
+        {
+          project: currentProject,
+          task: "sections",
+          targetId: chapterId,
+          context: {
+            chapterTitle: chapter.title,
+            chapterSynopsis: chapter.synopsis || "",
+            existingSections: chapter.sections.map((s) => s.title),
+            userBrief: brief,
+          },
         },
-        onChunk: (chunk) => {
-          fullContent += chunk;
-        },
-        onComplete: () => {
+        {
+          onChunk: (chunk) => {
+            fullContent += chunk;
+          },
+          onComplete: () => {
           setRawResponse(fullContent);
           
           try {
@@ -129,7 +133,7 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
         },
         onError: (err) => {
           console.error("Generation error:", err);
-          setError(err.message || "Failed to generate sections");
+          setError(err || "Failed to generate sections");
           setIsGenerating(false);
         },
       });
