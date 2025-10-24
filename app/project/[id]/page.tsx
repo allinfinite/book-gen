@@ -7,8 +7,8 @@ import { useUIStore } from "@/store/useUIStore";
 import { Chapter } from "@/types/book";
 import { ChapterEditor } from "@/components/ChapterEditor";
 import { AISidebar } from "@/components/AISidebar";
-import { VoiceRecorder } from "@/components/VoiceRecorder";
-import { Book, Plus, Save, ArrowLeft, FileDown, Mic, Trash2 } from "lucide-react";
+import { GenerateOutlineModal } from "@/components/GenerateOutlineModal";
+import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown } from "lucide-react";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -37,7 +37,8 @@ export default function ProjectPage() {
   const [chapterTitle, setChapterTitle] = useState("");
   const [chapterContent, setChapterContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showAddChapterMenu, setShowAddChapterMenu] = useState(false);
+  const [showGenerateOutlineModal, setShowGenerateOutlineModal] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -79,6 +80,11 @@ export default function ProjectPage() {
     setSelectedChapter(newChapter.id);
   }
 
+  function handleGenerateOutline() {
+    setShowGenerateOutlineModal(true);
+    setShowAddChapterMenu(false);
+  }
+
   async function handleSaveChapter() {
     if (!selectedChapterId || !currentProject) return;
 
@@ -114,17 +120,6 @@ export default function ProjectPage() {
     setIsSaving(false);
   }
 
-  function handleVoiceTranscription(text: string) {
-    console.log("Voice transcription received:", text);
-    // Append transcribed text to content
-    setChapterContent((prev) => {
-      const newContent = prev ? prev + "\n\n" + text : text;
-      console.log("New content:", newContent);
-      return newContent;
-    });
-    // Keep recorder open for continuous dictation
-    // setShowVoiceRecorder(false);
-  }
 
   async function handleDeleteChapter(chapterId: string) {
     if (!confirm("Are you sure you want to delete this chapter? This action cannot be undone.")) {
@@ -205,19 +200,14 @@ export default function ProjectPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-              className="flex items-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-accent"
-            >
-              <Mic className="w-4 h-4" />
-              Voice
-            </button>
-            <button
               onClick={toggleAISidebar}
-              className={`px-4 py-2 border border-input rounded-md hover:bg-accent ${
+              className={`flex items-center gap-2 px-4 py-2 border border-input rounded-md hover:bg-accent ${
                 showAISidebar ? "bg-accent" : ""
               }`}
+              title="Toggle AI Assistant"
             >
-              AI
+              <Sparkles className="w-4 h-4" />
+              AI Assistant
             </button>
             {lastSaved && (
               <span className="text-sm text-muted-foreground">
@@ -255,13 +245,60 @@ export default function ProjectPage() {
         {/* Sidebar - Chapter List */}
         <aside className="w-64 border-r border-border overflow-y-auto bg-card">
           <div className="p-4">
-            <button
-              onClick={handleAddChapter}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 mb-4"
-            >
-              <Plus className="w-4 h-4" />
-              Add Chapter
-            </button>
+            {/* Add Chapter Button with Dropdown */}
+            <div className="relative mb-4">
+              <div className="flex gap-1">
+                <button
+                  onClick={handleAddChapter}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-l-md hover:bg-primary/90"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Chapter
+                </button>
+                <button
+                  onClick={() => setShowAddChapterMenu(!showAddChapterMenu)}
+                  className="px-2 bg-primary text-primary-foreground rounded-r-md hover:bg-primary/90 border-l border-primary-foreground/20"
+                  title="More options"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Dropdown Menu */}
+              {showAddChapterMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowAddChapterMenu(false)}
+                  />
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-lg z-20 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        handleAddChapter();
+                        setShowAddChapterMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-accent text-left text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">Empty Chapter</div>
+                        <div className="text-xs text-muted-foreground">Write from scratch</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleGenerateOutline}
+                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-accent text-left text-sm border-t border-border"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">AI Generated Outline</div>
+                        <div className="text-xs text-muted-foreground">Create chapter structure (titles only)</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="space-y-2">
               {currentProject.chapters.length === 0 ? (
@@ -367,13 +404,11 @@ export default function ProjectPage() {
         )}
       </div>
 
-      {/* Voice Recorder */}
-      {showVoiceRecorder && (
-        <VoiceRecorder
-          onTranscriptionComplete={handleVoiceTranscription}
-          onError={(err) => console.error("Voice recorder error:", err)}
-        />
-      )}
+      {/* Generate Outline Modal */}
+      <GenerateOutlineModal
+        isOpen={showGenerateOutlineModal}
+        onClose={() => setShowGenerateOutlineModal(false)}
+      />
     </div>
   );
 }

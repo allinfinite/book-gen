@@ -38,17 +38,30 @@
   - Context-aware (includes prior chapters)
 
 - **Voice Input**
-  - Floating recorder button
-  - Keyboard shortcut (Cmd/Ctrl+R)
+  - Integrated directly into AI sidebar
+  - Inline recording interface
   - Real-time transcription via Whisper API
-  - Append to chapter content
+  - Auto-populates prompt field for AI generation
+  - Seamless voice-to-AI workflow
 
 #### 4. Chapter Management
+- **Smart "Add Chapter" Button**
+  - Split button with dropdown menu
+  - **Quick add**: Empty chapter (write manually)
+  - **AI Generated Outline**: Opens modal to generate chapter structure
+    - Creates chapter and section **titles only** (not content)
+    - Voice or text input for describing book structure
+    - Generates hierarchical outline (parts, chapters, sections)
+    - Preview structure before accepting
+    - Adds all empty chapters to project with one click
+    - You write the actual content yourself later
+
 - **Chapter List Sidebar**
   - Visual status indicators
   - Section count display
   - Word count per chapter
   - Click to switch chapters
+  - Delete chapter option
 
 - **Word Count Tracking**
   - Live count updates
@@ -64,11 +77,20 @@
   - Snapshots (planned)
 - **Version tracking** on each save
 
-#### 6. Export
+#### 6. Export & Import
 - **JSON Export** (fully functional)
   - Complete project backup
   - All metadata included
-  - Ready for import
+  - Downloadable .book.json file
+  
+- **JSON Import** (fully functional)
+  - Import previously exported projects
+  - Accessible from home page header
+  - Automatic ID generation (prevents conflicts)
+  - Marks imported projects with "(Imported)" suffix
+  - Validates file format before import
+  - Auto-navigates to imported project
+  
 - **EPUB 3** (coming soon)
 - **PDF** (coming soon)
 

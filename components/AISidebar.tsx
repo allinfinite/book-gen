@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUIStore } from "@/store/useUIStore";
 import { streamGenerate } from "@/lib/ai/generateClient";
-import { Sparkles, Loader2, X, Wand2 } from "lucide-react";
+import { Sparkles, Loader2, X, Wand2, Mic, Square } from "lucide-react";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 interface AISidebarProps {
   chapterId: string;
@@ -22,6 +23,18 @@ export function AISidebar({ chapterId }: AISidebarProps) {
   const [abortController, setAbortController] = useState<AbortController | null>(
     null
   );
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+
+  function handleVoiceTranscription(text: string) {
+    // Append or set the transcribed text to the prompt
+    setUserPrompt((prev) => {
+      if (prev.trim()) {
+        return prev + "\n\n" + text;
+      }
+      return text;
+    });
+    setShowVoiceRecorder(false);
+  }
 
   async function handleGenerateChapter() {
     if (!currentProject || !isOnline) return;
@@ -123,15 +136,38 @@ export function AISidebar({ chapterId }: AISidebarProps) {
       <div className="p-4 space-y-4">
         {/* User Prompt */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Brief (Optional)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium">
+              Chapter Brief
+            </label>
+            <button
+              onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+              disabled={isGenerating || !isOnline}
+              className={`flex items-center gap-1 px-2 py-1 text-xs border border-input rounded hover:bg-accent disabled:opacity-50 ${
+                showVoiceRecorder ? "bg-accent" : ""
+              }`}
+            >
+              <Mic className="w-3 h-3" />
+              {showVoiceRecorder ? "Hide" : "Voice"}
+            </button>
+          </div>
+          
+          {showVoiceRecorder && (
+            <div className="mb-3 p-3 border border-primary/20 bg-primary/5 rounded-md">
+              <VoiceRecorder
+                inline={true}
+                onTranscriptionComplete={handleVoiceTranscription}
+                onError={(err) => console.error("Voice error:", err)}
+              />
+            </div>
+          )}
+          
           <textarea
             value={userPrompt}
             onChange={(e) => setUserPrompt(e.target.value)}
-            placeholder="Describe what you want in this chapter..."
+            placeholder="Describe what you want in this chapter... (type or use voice)"
             className="w-full px-3 py-2 border border-input rounded-md bg-background resize-none"
-            rows={4}
+            rows={6}
             disabled={isGenerating || !isOnline}
           />
         </div>

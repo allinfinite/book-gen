@@ -7,11 +7,13 @@ import { Mic, Square, Loader2 } from "lucide-react";
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string) => void;
   onError?: (error: string) => void;
+  inline?: boolean; // If true, render inline instead of floating
 }
 
 export function VoiceRecorder({
   onTranscriptionComplete,
   onError,
+  inline = false,
 }: VoiceRecorderProps) {
   const { isRecording, startRecording, stopRecording, updateRecordingDuration } =
     useUIStore();
@@ -228,6 +230,76 @@ export function VoiceRecorder({
     }
   }
 
+  // Inline version for use in sidebars
+  if (inline) {
+    return (
+      <div className="space-y-3">
+        {error && (
+          <div className="bg-destructive/10 text-destructive px-3 py-2 rounded-md text-xs">
+            {error}
+          </div>
+        )}
+
+        {/* Waveform Visualization */}
+        {isRecording && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+              <span className="text-xs font-medium">Recording...</span>
+            </div>
+            <div className="flex-1 flex items-center gap-1 h-8">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1 bg-primary rounded-full transition-all duration-75"
+                  style={{
+                    height: `${Math.max(4, audioLevel * 32 * (Math.random() * 0.5 + 0.5))}px`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Transcribing Status */}
+        {isTranscribing && (
+          <div className="flex items-center gap-2 text-xs">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span>Transcribing audio...</span>
+          </div>
+        )}
+
+        <button
+          onClick={isRecording ? handleStopRecording : handleStartRecording}
+          disabled={isTranscribing}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all text-sm ${
+            isRecording
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
+          } ${isTranscribing ? "opacity-50 cursor-not-allowed" : ""}`}
+        >
+          {isTranscribing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Processing...</span>
+            </>
+          ) : isRecording ? (
+            <>
+              <Square className="w-4 h-4" />
+              <span>Stop Recording</span>
+            </>
+          ) : (
+            <>
+              <Mic className="w-4 h-4" />
+              <span>Start Recording</span>
+            </>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  // Floating version (original)
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <div className="flex flex-col items-end gap-2">

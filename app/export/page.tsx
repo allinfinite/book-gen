@@ -78,7 +78,7 @@ export default function ExportPage() {
                 <div className="flex-1">
                   <div className="font-medium">JSON</div>
                   <div className="text-sm text-muted-foreground">
-                    Export project data for backup or sharing
+                    Export project data for backup or sharing. Can be re-imported later.
                   </div>
                 </div>
               </label>

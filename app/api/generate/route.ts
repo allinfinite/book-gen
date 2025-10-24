@@ -9,8 +9,9 @@ import {
   buildReviseOutlinePrompt,
 } from "@/lib/ai/prompts";
 
-const MAX_TOKENS = 4000;
+const MAX_COMPLETION_TOKENS = 4000; // Maximum tokens in the AI response
 const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5"; // Use GPT-5 by default
 
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
@@ -142,13 +143,13 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: DEFAULT_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: controls?.temperature ?? DEFAULT_TEMPERATURE,
-        max_tokens: controls?.maxTokens ?? MAX_TOKENS,
+        max_completion_tokens: controls?.maxTokens ?? MAX_COMPLETION_TOKENS, // GPT-5+ uses max_completion_tokens
         stream: true,
       }),
     });

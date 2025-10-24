@@ -47,7 +47,9 @@ Task: Produce a hierarchical outline as a JSON array of OutlineNode objects. Eac
 Rules:
 - For fiction: escalating stakes, end-of-chapter hooks, avoid redundancy
 - For nonfiction: logical progression, clear learning objectives
-- Return ONLY valid JSON, no explanatory text`;
+- Return ONLY valid JSON, no explanatory text, no markdown code fences
+- Start your response with [ and end with ]
+- Do not include any text before or after the JSON array`;
 
   const user = `Premise: ${project.premise || ""}
 
