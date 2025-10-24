@@ -23,9 +23,8 @@ export function VoiceRecorder({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     // Keyboard shortcut: R key
@@ -50,8 +49,8 @@ export function VoiceRecorder({
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
@@ -64,54 +63,26 @@ export function VoiceRecorder({
         audio: true,
       });
 
+      streamRef.current = stream;
       console.log("Got media stream, tracks:", stream.getAudioTracks().length);
       const audioTrack = stream.getAudioTracks()[0];
       console.log("Audio track settings:", audioTrack.getSettings());
 
-      // Set up audio visualization
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
+      // DON'T set up audio visualization for now - it interferes with MediaRecorder
+      // The AudioContext analyser can consume the stream and prevent MediaRecorder from working
+      // We'll just use a simple animation instead
 
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
+      // Simple pulse animation while recording
+      const animatePulse = () => {
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
 
-      // Start visualization
-      let maxLevel = 0;
-      let levelCheckCount = 0;
-      const updateLevel = () => {
-        if (!analyserRef.current || !mediaRecorderRef.current) return;
+        // Create a simple pulse effect
+        const pulseValue = 0.3 + Math.random() * 0.4;
+        setAudioLevel(pulseValue);
 
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(dataArray);
-
-        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        const normalizedLevel = average / 255;
-        setAudioLevel(normalizedLevel);
-
-        // Track max level for debugging
-        if (normalizedLevel > maxLevel) {
-          maxLevel = normalizedLevel;
-        }
-        levelCheckCount++;
-
-        // Log audio level every 50 frames
-        if (levelCheckCount % 50 === 0) {
-          console.log("Audio level check:", {
-            current: normalizedLevel.toFixed(3),
-            max: maxLevel.toFixed(3),
-            raw: average.toFixed(1),
-          });
-        }
-
-        // Continue animation while recorder is active
-        if (mediaRecorderRef.current?.state === "recording") {
-          animationFrameRef.current = requestAnimationFrame(updateLevel);
-        }
+        animationFrameRef.current = requestAnimationFrame(animatePulse);
       };
-      updateLevel();
+      animatePulse();
 
       // Try to get the best audio quality
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -145,18 +116,18 @@ export function VoiceRecorder({
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         console.log("Blob created:", blob.size, "bytes");
 
-        // Clean up audio context
+        // Clean up animation
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
-        }
-        if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-          audioContextRef.current.close();
         }
 
         await transcribeAudio(blob);
 
         // Stop all tracks
-        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
       };
 
       // Start recording with time slice to ensure we capture all data
@@ -181,12 +152,6 @@ export function VoiceRecorder({
     if (mediaRecorderRef.current && isRecording) {
       const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
       console.log("Stopping recording. Duration:", duration, "seconds");
-      console.log("Current audio level:", audioLevel.toFixed(3));
-
-      // Warn if audio level was too low
-      if (audioLevel < 0.01) {
-        console.warn("⚠️ Audio level is very low! Microphone might not be working or volume is too quiet.");
-      }
 
       // Request final data before stopping
       if (mediaRecorderRef.current.state === "recording") {
