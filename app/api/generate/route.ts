@@ -148,8 +148,11 @@ export async function POST(req: NextRequest) {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: controls?.temperature ?? DEFAULT_TEMPERATURE,
-        max_completion_tokens: controls?.maxTokens ?? MAX_COMPLETION_TOKENS, // GPT-5+ uses max_completion_tokens
+        // GPT-5 only supports default temperature (1), don't send custom values
+        ...(DEFAULT_MODEL !== "gpt-5" && {
+          temperature: controls?.temperature ?? DEFAULT_TEMPERATURE,
+        }),
+        max_completion_tokens: controls?.maxTokens ?? MAX_COMPLETION_TOKENS,
         stream: true,
       }),
     });
