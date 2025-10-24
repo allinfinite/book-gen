@@ -27,6 +27,8 @@ export function VoiceRecorder({
   const startTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
 
   useEffect(() => {
     // Keyboard shortcut: R key
@@ -53,6 +55,9 @@ export function VoiceRecorder({
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
       }
     };
   }, []);
@@ -85,29 +90,55 @@ export function VoiceRecorder({
       console.log("Audio track settings:", audioTrack.getSettings());
       console.log("Audio track label:", audioTrack.label);
 
-      // Test: Create an audio element to verify stream has audio
-      const audio = new Audio();
-      audio.srcObject = stream;
-      audio.muted = true; // Mute to avoid feedback
-      audio.volume = 0;
-      await audio.play().catch(e => console.error("Audio play test failed:", e));
-      console.log("Audio element test: playing stream (muted)");
+      // Set up audio visualization using Web Audio API
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = audioContext;
 
-      // DON'T set up audio visualization for now - it interferes with MediaRecorder
-      // The AudioContext analyser can consume the stream and prevent MediaRecorder from working
-      // We'll just use a simple animation instead
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        analyserRef.current = analyser;
 
-      // Simple pulse animation while recording
-      const animatePulse = () => {
-        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
 
-        // Create a simple pulse effect
-        const pulseValue = 0.3 + Math.random() * 0.4;
-        setAudioLevel(pulseValue);
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
 
-        animationFrameRef.current = requestAnimationFrame(animatePulse);
-      };
-      animatePulse();
+        // Real-time audio level visualization
+        const visualize = () => {
+          if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
+
+          analyser.getByteFrequencyData(dataArray);
+
+          // Calculate average volume
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          
+          // Normalize to 0-1 range and apply sensitivity
+          const normalizedLevel = Math.min((average / 128) * 1.5, 1);
+          setAudioLevel(normalizedLevel);
+
+          animationFrameRef.current = requestAnimationFrame(visualize);
+        };
+
+        visualize();
+        console.log("Audio visualization started");
+      } catch (err) {
+        console.error("Failed to set up audio visualization:", err);
+        // Fallback to simple pulse animation
+        const animatePulse = () => {
+          if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
+          const pulseValue = 0.3 + Math.random() * 0.4;
+          setAudioLevel(pulseValue);
+          animationFrameRef.current = requestAnimationFrame(animatePulse);
+        };
+        animatePulse();
+      }
 
       // Try to get the best audio quality
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -148,7 +179,11 @@ export function VoiceRecorder({
 
         await transcribeAudio(blob);
 
-        // Stop all tracks
+        // Clean up audio context and stream
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
@@ -247,16 +282,23 @@ export function VoiceRecorder({
               <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
               <span className="text-xs font-medium">Recording...</span>
             </div>
-            <div className="flex-1 flex items-center gap-1 h-8">
-              {Array.from({ length: 15 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-primary rounded-full transition-all duration-75"
-                  style={{
-                    height: `${Math.max(4, audioLevel * 32 * (Math.random() * 0.5 + 0.5))}px`,
-                  }}
-                />
-              ))}
+            <div className="flex-1 flex items-center justify-center gap-1 h-8">
+              {Array.from({ length: 15 }).map((_, i) => {
+                // Create wave effect with center emphasis
+                const centerDistance = Math.abs(i - 7) / 7;
+                const centerMultiplier = 1 - (centerDistance * 0.3);
+                const barHeight = Math.max(4, audioLevel * 32 * centerMultiplier * (0.8 + Math.random() * 0.4));
+                
+                return (
+                  <div
+                    key={i}
+                    className="w-1 bg-primary rounded-full transition-all duration-100"
+                    style={{
+                      height: `${barHeight}px`,
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -316,16 +358,23 @@ export function VoiceRecorder({
               <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
               <span className="text-sm font-medium">Recording...</span>
             </div>
-            <div className="flex items-center gap-1 h-12">
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-primary rounded-full transition-all duration-75"
-                  style={{
-                    height: `${Math.max(4, audioLevel * 48 * (Math.random() * 0.5 + 0.5))}px`,
-                  }}
-                />
-              ))}
+            <div className="flex items-center justify-center gap-1 h-12">
+              {Array.from({ length: 20 }).map((_, i) => {
+                // Create wave effect with center emphasis
+                const centerDistance = Math.abs(i - 10) / 10;
+                const centerMultiplier = 1 - (centerDistance * 0.3);
+                const barHeight = Math.max(4, audioLevel * 48 * centerMultiplier * (0.8 + Math.random() * 0.4));
+                
+                return (
+                  <div
+                    key={i}
+                    className="w-1 bg-primary rounded-full transition-all duration-100"
+                    style={{
+                      height: `${barHeight}px`,
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
