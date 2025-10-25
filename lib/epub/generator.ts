@@ -498,8 +498,13 @@ function generateChapterXhtml(
           .join("\n");
       }
 
+      // Only show section title if it exists and isn't "Opening"
+      const sectionTitleHtml = section.title && section.title !== "Opening"
+        ? `<h2 class="section-title">${escapeXml(section.title)}</h2>`
+        : "";
+      
       return `    <section class="section">
-      <h2 class="section-title">${escapeXml(section.title)}</h2>
+      ${sectionTitleHtml}
       ${imagesHtml}
       ${content}
     </section>`;
@@ -542,20 +547,32 @@ function escapeXml(text: string): string {
 function cleanHtmlForEpub(html: string): string {
   if (!html) return "";
   
+  // First, escape any unescaped ampersands in text content
+  // This regex finds & that aren't part of existing HTML entities
+  html = html.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, "&amp;");
+  
   // Remove empty paragraphs
   html = html.replace(/<p>\s*<\/p>/gi, "");
   
   // Ensure <br> tags are self-closing for XHTML
   html = html.replace(/<br>/gi, "<br/>");
+  html = html.replace(/<br\s+\/>/gi, "<br/>");
   
   // Ensure <img> tags are self-closing
   html = html.replace(/<img([^>]+)>/gi, "<img$1/>");
+  
+  // Ensure <hr> tags are self-closing
+  html = html.replace(/<hr>/gi, "<hr/>");
+  html = html.replace(/<hr\s+\/>/gi, "<hr/>");
   
   // Remove any inline styles that might cause issues
   html = html.replace(/style="[^"]*"/gi, "");
   
   // Ensure proper closing tags
   html = html.replace(/<p([^>]*)>/gi, "<p$1>").replace(/<\/p>/gi, "</p>");
+  
+  // Fix any attribute values that might have unescaped quotes
+  // This is already handled by the editor, but just in case
   
   return html;
 }
