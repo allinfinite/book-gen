@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useUIStore } from "@/store/useUIStore";
-import { Chapter } from "@/types/book";
+import { Chapter, MediaRef } from "@/types/book";
 import { ChapterEditor } from "@/components/ChapterEditor";
 import { AISidebar } from "@/components/AISidebar";
 import { GenerateOutlineModal } from "@/components/GenerateOutlineModal";
 import { GenerateSectionsModal } from "@/components/GenerateSectionsModal";
 import { BookSettingsModal } from "@/components/BookSettingsModal";
-import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown, Settings, ChevronRight } from "lucide-react";
+import { ImageGenerationModal } from "@/components/ImageGenerationModal";
+import { Book, Plus, Save, ArrowLeft, FileDown, Trash2, Sparkles, ChevronDown, Settings, ChevronRight, Image as ImageIcon } from "lucide-react";
+import { getMediaAsDataURL } from "@/lib/idb";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -27,6 +29,9 @@ export default function ProjectPage() {
     deleteChapter,
     deleteProject,
     save,
+    updateChapterImage,
+    addSectionImage,
+    removeSectionImage,
   } = useProjectStore();
 
   const {
@@ -45,6 +50,56 @@ export default function ProjectPage() {
   const [showGenerateSectionsModal, setShowGenerateSectionsModal] = useState(false);
   const [showBookSettings, setShowBookSettings] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
+  const [showChapterImageModal, setShowChapterImageModal] = useState(false);
+  const [showSectionImageModal, setShowSectionImageModal] = useState(false);
+  const [chapterImageUrl, setChapterImageUrl] = useState<string | null>(null);
+  const [sectionImageUrls, setSectionImageUrls] = useState<Map<string, string>>(new Map());
+  const [rewritePreviewData, setRewritePreviewData] = useState<{
+    mode: "rewrite" | "generate";
+    isGenerating: boolean;
+    generatedText: string;
+    error?: string;
+    onAccept?: () => void;
+    onReject?: () => void;
+  } | null>(null);
+  const editorHandlersRef = useRef<{ onAccept: () => void; onReject: () => void } | null>(null);
+
+  const handleRewritePreview = useCallback((
+    preview: {
+      mode: "rewrite" | "generate";
+      isGenerating: boolean;
+      generatedText: string;
+      error?: string;
+    } | null,
+    handlers?: {
+      onAccept: () => void;
+      onReject: () => void;
+    }
+  ) => {
+    if (preview) {
+      // Open the AI sidebar automatically when rewriting
+      if (!showAISidebar) {
+        toggleAISidebar();
+      }
+      // Store handlers from editor
+      editorHandlersRef.current = handlers || null;
+      // Store preview data with wrapped handlers
+      setRewritePreviewData({
+        ...preview,
+        onAccept: () => {
+          editorHandlersRef.current?.onAccept();
+          setRewritePreviewData(null);
+        },
+        onReject: () => {
+          editorHandlersRef.current?.onReject();
+          setRewritePreviewData(null);
+        },
+      });
+    } else {
+      setRewritePreviewData(null);
+      editorHandlersRef.current = null;
+    }
+  }, [showAISidebar, toggleAISidebar]);
 
   useEffect(() => {
     if (projectId) {
@@ -65,11 +120,20 @@ export default function ProjectPage() {
         if (!selectedSectionId && chapter.sections.length > 0) {
           setSelectedSectionId(chapter.sections[0].id);
         }
+        
+        // Load chapter image if exists
+        if (chapter.imageId) {
+          getMediaAsDataURL(chapter.imageId).then((url) => {
+            if (url) setChapterImageUrl(url);
+          });
+        } else {
+          setChapterImageUrl(null);
+        }
       }
     }
   }, [selectedChapterId, currentProject]);
 
-  // Load selected section content
+  // Load selected section content and images
   useEffect(() => {
     if (selectedChapterId && selectedSectionId && currentProject) {
       const chapter = currentProject.chapters.find(
@@ -79,6 +143,21 @@ export default function ProjectPage() {
         const section = chapter.sections.find((s) => s.id === selectedSectionId);
         if (section) {
           setSectionContent(section.content);
+          
+          // Load section images
+          if (section.images && section.images.length > 0) {
+            const urlMap = new Map<string, string>();
+            Promise.all(
+              section.images.map(async (img) => {
+                const url = await getMediaAsDataURL(img.id);
+                if (url) urlMap.set(img.id, url);
+              })
+            ).then(() => {
+              setSectionImageUrls(urlMap);
+            });
+          } else {
+            setSectionImageUrls(new Map());
+          }
         }
       }
     }
@@ -111,7 +190,7 @@ export default function ProjectPage() {
       notes: "",
     };
     addChapter(newChapter);
-    setSelectedChapter(newChapter.id);
+    handleSelectChapter(newChapter.id);
   }
 
   function handleGenerateOutline() {
@@ -131,7 +210,41 @@ export default function ProjectPage() {
     });
   }
 
-  function handleSelectSection(sectionId: string) {
+  async function saveCurrentSection() {
+    // Helper function to save the current section
+    if (selectedSectionId && selectedChapterId && currentProject) {
+      const chapter = currentProject.chapters.find((ch) => ch.id === selectedChapterId);
+      if (chapter) {
+        const updatedSections = chapter.sections.map((section) =>
+          section.id === selectedSectionId
+            ? { ...section, content: sectionContent }
+            : section
+        );
+
+        // Calculate total word count
+        const wordCount = updatedSections
+          .map((s) => s.content.split(/\s+/).filter(Boolean).length)
+          .reduce((a, b) => a + b, 0);
+
+        updateChapter(selectedChapterId, {
+          sections: updatedSections,
+          wordCount,
+        });
+
+        await save();
+      }
+    }
+  }
+
+  async function handleSelectChapter(chapterId: string | null) {
+    // Auto-save current section before switching chapters
+    await saveCurrentSection();
+    setSelectedChapter(chapterId);
+  }
+
+  async function handleSelectSection(sectionId: string) {
+    // Auto-save current section before switching
+    await saveCurrentSection();
     setSelectedSectionId(sectionId);
   }
 
@@ -224,7 +337,7 @@ export default function ProjectPage() {
 
     // If we deleted the currently selected chapter, clear selection
     if (selectedChapterId === chapterId) {
-      setSelectedChapter(null);
+      handleSelectChapter(null);
     }
   }
 
@@ -432,7 +545,7 @@ export default function ProjectPage() {
                             )}
                           </button>
                           <div
-                            onClick={() => setSelectedChapter(chapter.id)}
+                            onClick={() => handleSelectChapter(chapter.id)}
                             className="cursor-pointer flex-1"
                           >
                             <div className="text-sm font-medium">
@@ -469,7 +582,7 @@ export default function ProjectPage() {
                               <button
                                 key={section.id}
                                 onClick={() => {
-                                  setSelectedChapter(chapter.id);
+                                  handleSelectChapter(chapter.id);
                                   handleSelectSection(section.id);
                                 }}
                                 className={`w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
@@ -503,17 +616,60 @@ export default function ProjectPage() {
         <main className="flex-1 overflow-y-auto">
           {selectedChapterId && selectedSectionId ? (
             <div className="max-w-4xl mx-auto p-8">
-              {/* Chapter Title */}
+              {/* Chapter Title and Image */}
               <div className="mb-6">
-                <input
-                  type="text"
-                  value={chapterTitle}
-                  onChange={(e) => setChapterTitle(e.target.value)}
-                  onBlur={handleSaveSection}
-                  className="w-full text-3xl font-bold bg-transparent border-none outline-none mb-2"
-                  placeholder="Chapter Title"
-                />
-                <div className="h-px bg-border"></div>
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={chapterTitle}
+                      onChange={(e) => setChapterTitle(e.target.value)}
+                      onBlur={handleSaveSection}
+                      className="w-full text-3xl font-bold bg-transparent border-none outline-none mb-2"
+                      placeholder="Chapter Title"
+                    />
+                  </div>
+                  
+                  {/* Chapter Image */}
+                  {chapterImageUrl ? (
+                    <div className="relative group">
+                      <img
+                        src={chapterImageUrl}
+                        alt="Chapter illustration"
+                        className="w-32 h-32 object-cover rounded-lg border border-border"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setShowChapterImageModal(true)}
+                          className="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                          title="Replace image"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            updateChapterImage(selectedChapterId, undefined);
+                            setChapterImageUrl(null);
+                          }}
+                          className="p-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+                          title="Remove image"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowChapterImageModal(true)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm border border-dashed border-border rounded-lg hover:bg-accent hover:border-primary transition-colors"
+                      title="Generate chapter image"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      <span className="text-xs">Add Image</span>
+                    </button>
+                  )}
+                </div>
+                <div className="h-px bg-border mt-2"></div>
               </div>
 
               {/* Section Navigation */}
@@ -543,20 +699,20 @@ export default function ProjectPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => setShowSectionImageModal(true)}
+                          className="px-3 py-1.5 text-sm border border-input rounded-md hover:bg-accent flex items-center gap-1"
+                          title="Add image to section"
+                        >
+                          <ImageIcon className="w-3 h-3" />
+                          Add Image
+                        </button>
+                        <button
                           onClick={handleAddSection}
                           className="px-3 py-1.5 text-sm border border-input rounded-md hover:bg-accent flex items-center gap-1"
                           title="Add new section"
                         >
                           <Plus className="w-3 h-3" />
                           Add Section
-                        </button>
-                        <button
-                          onClick={() => setShowGenerateSectionsModal(true)}
-                          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center gap-1"
-                          title="AI generate all sections"
-                        >
-                          <Sparkles className="w-3 h-3" />
-                          AI Sections
                         </button>
                         {chapter.sections.length > 1 && (
                           <button
@@ -569,6 +725,33 @@ export default function ProjectPage() {
                         )}
                       </div>
                     </div>
+                    
+                    {/* Section Images */}
+                    {currentSection.images && currentSection.images.length > 0 && (
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        {currentSection.images.map((img) => {
+                          const url = sectionImageUrls.get(img.id);
+                          return url ? (
+                            <div key={img.id} className="relative group">
+                              <img
+                                src={url}
+                                alt={img.altText || "Section image"}
+                                className="h-24 w-auto object-cover rounded-md border border-border"
+                              />
+                              <button
+                                onClick={() => {
+                                  removeSectionImage(selectedChapterId, selectedSectionId, img.id);
+                                }}
+                                className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove image"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
                     
                     {/* Section selector tabs */}
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border">
@@ -594,6 +777,8 @@ export default function ProjectPage() {
                 content={sectionContent}
                 onChange={setSectionContent}
                 placeholder="Start writing this section..."
+                onAIAssistClick={toggleAISidebar}
+                onRewritePreview={handleRewritePreview}
               />
 
               <div className="mt-4 flex items-center justify-between text-sm">
@@ -648,6 +833,7 @@ export default function ProjectPage() {
               // Insert AI-generated content into the current section
               setSectionContent(content);
             }}
+            rewritePreview={rewritePreviewData}
           />
         )}
       </div>
@@ -672,6 +858,57 @@ export default function ProjectPage() {
         isOpen={showBookSettings}
         onClose={() => setShowBookSettings(false)}
       />
+
+      {/* Chapter Image Generation Modal */}
+      {currentProject && selectedChapterId && (
+        <ImageGenerationModal
+          isOpen={showChapterImageModal}
+          onClose={() => setShowChapterImageModal(false)}
+          context={{
+            type: "chapter",
+            chapter: currentProject.chapters.find((ch) => ch.id === selectedChapterId)!,
+            project: currentProject,
+          }}
+          onImageGenerated={(imageId) => {
+            updateChapterImage(selectedChapterId, imageId);
+            getMediaAsDataURL(imageId).then((url) => {
+              if (url) setChapterImageUrl(url);
+            });
+          }}
+        />
+      )}
+
+      {/* Section Image Generation Modal */}
+      {currentProject && selectedChapterId && selectedSectionId && (
+        <ImageGenerationModal
+          isOpen={showSectionImageModal}
+          onClose={() => setShowSectionImageModal(false)}
+          context={{
+            type: "section",
+            section: currentProject.chapters
+              .find((ch) => ch.id === selectedChapterId)!
+              .sections.find((s) => s.id === selectedSectionId)!,
+            chapter: currentProject.chapters.find((ch) => ch.id === selectedChapterId)!,
+            project: currentProject,
+          }}
+          onImageGenerated={(imageId) => {
+            const mediaRef: MediaRef = {
+              id: imageId,
+              kind: "image",
+              mime: "image/png",
+              createdAt: new Date().toISOString(),
+            };
+            addSectionImage(selectedChapterId, selectedSectionId, mediaRef);
+            
+            // Update the local state to show the new image
+            getMediaAsDataURL(imageId).then((url) => {
+              if (url) {
+                setSectionImageUrls((prev) => new Map(prev).set(imageId, url));
+              }
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -74,6 +74,7 @@ export const ChapterSchema = z.object({
   notes: z.string().optional(),
   status: z.enum(["outline", "draft", "revising", "final"]).default("outline"),
   wordCount: z.number().optional(),
+  imageId: z.string().optional(),
 });
 
 export type Chapter = z.infer<typeof ChapterSchema>;
@@ -106,6 +107,34 @@ export const ChangeRecordSchema = z.object({
 
 export type ChangeRecord = z.infer<typeof ChangeRecordSchema>;
 
+// Document Reference Schema
+export const DocumentRefSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["reference", "style"]),
+  extractedText: z.string(),
+  uploadedAt: z.string(),
+  fileSize: z.number(),
+  includeInGeneration: z.boolean().default(true),
+});
+
+export type DocumentRef = z.infer<typeof DocumentRefSchema>;
+
+// Custom Style Analysis Schema
+export const CustomStyleAnalysisSchema = z.object({
+  id: z.string(),
+  sourceDocIds: z.array(z.string()),
+  analysis: z.object({
+    pov: z.string(),
+    tense: z.string(),
+    voice: z.string(),
+    patterns: z.array(z.string()),
+  }),
+  createdAt: z.string(),
+});
+
+export type CustomStyleAnalysis = z.infer<typeof CustomStyleAnalysisSchema>;
+
 // Book Project Schema
 export const BookProjectSchema = z.object({
   meta: BookMetaSchema,
@@ -117,6 +146,9 @@ export const BookProjectSchema = z.object({
   customStyle: StylePresetSchema.optional(),
   history: z.array(ChangeRecordSchema).optional(),
   coverImageId: z.string().optional(),
+  referenceDocuments: z.array(DocumentRefSchema).optional(),
+  styleDocuments: z.array(DocumentRefSchema).optional(),
+  customStyleAnalysis: CustomStyleAnalysisSchema.optional(),
 });
 
 export type BookProject = z.infer<typeof BookProjectSchema>;
@@ -162,6 +194,14 @@ export const DEFAULT_STYLE_PRESETS: StylePreset[] = [
     tense: "present",
     voice: "Second person instructional, step-by-step",
     constraints: ["clear instructions", "concrete examples"],
+  },
+  {
+    id: "custom-from-uploads",
+    name: "Custom (from uploads)",
+    pov: "3p-limited",
+    tense: "past",
+    voice: "Based on your uploaded writing samples",
+    constraints: [],
   },
 ];
 

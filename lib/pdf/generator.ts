@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { BookProject } from "@/types/book";
+import { getMediaAsDataURL } from "@/lib/idb";
 
 /**
  * Generate a PDF with Amazon KDP-compatible formatting
@@ -78,23 +79,41 @@ export async function generatePDF(project: BookProject): Promise<Blob> {
   };
 
   // Title Page (page 1)
+  let titlePageY = margins.top + 40;
+  
+  // Add cover image if exists
+  if (project.coverImageId) {
+    try {
+      const coverUrl = await getMediaAsDataURL(project.coverImageId);
+      if (coverUrl) {
+        const coverWidth = 200;
+        const coverHeight = 300;
+        const coverX = (pageWidth - coverWidth) / 2;
+        doc.addImage(coverUrl, "PNG", coverX, titlePageY, coverWidth, coverHeight);
+        titlePageY = titlePageY + coverHeight + 40;
+      }
+    } catch (err) {
+      console.error("Failed to add cover image:", err);
+    }
+  }
+  
   doc.setFont("times", "bold");
   doc.setFontSize(36);
   const titleLines = doc.splitTextToSize(project.meta.title, getTextWidth());
   const titleHeight = titleLines.length * 36 * 1.2;
-  const titleY = pageHeight / 2 - titleHeight / 2;
-  doc.text(titleLines, pageWidth / 2, titleY, {
+  doc.text(titleLines, pageWidth / 2, titlePageY, {
     align: "center",
     lineHeightFactor: 1.2,
   });
+  titlePageY += titleHeight + 20;
 
   if (project.meta.subtitle) {
     doc.setFontSize(18);
     doc.setFont("times", "normal");
-    const subtitleY = titleY + titleHeight + 20;
-    doc.text(project.meta.subtitle, pageWidth / 2, subtitleY, {
+    doc.text(project.meta.subtitle, pageWidth / 2, titlePageY, {
       align: "center",
     });
+    titlePageY += 30;
   }
 
   doc.setFontSize(24);
@@ -143,7 +162,9 @@ export async function generatePDF(project: BookProject): Promise<Blob> {
   });
 
   // Chapters
-  project.chapters.forEach((chapter, chapterIndex) => {
+  for (let chapterIndex = 0; chapterIndex < project.chapters.length; chapterIndex++) {
+    const chapter = project.chapters[chapterIndex];
+    
     // Start each chapter on a new page
     addPage();
 
@@ -162,9 +183,28 @@ export async function generatePDF(project: BookProject): Promise<Blob> {
       lineHeightFactor: 1.2,
     });
     currentY += chapterNameLines.length * 20 * 1.2 + 30;
+    
+    // Add chapter image if exists
+    if (chapter.imageId) {
+      try {
+        const imageUrl = await getMediaAsDataURL(chapter.imageId);
+        if (imageUrl) {
+          const imgWidth = 150;
+          const imgHeight = 150;
+          checkPageBreak(imgHeight + 20);
+          const imgX = (pageWidth - imgWidth) / 2;
+          doc.addImage(imageUrl, "PNG", imgX, currentY, imgWidth, imgHeight);
+          currentY += imgHeight + 20;
+        }
+      } catch (err) {
+        console.error(`Failed to add chapter ${chapterIndex + 1} image:`, err);
+      }
+    }
 
     // Sections
-    chapter.sections.forEach((section, sectionIndex) => {
+    for (let sectionIndex = 0; sectionIndex < chapter.sections.length; sectionIndex++) {
+      const section = chapter.sections[sectionIndex];
+      
       // Section title
       if (section.title && section.title !== "Opening") {
         checkPageBreak(30);
@@ -175,6 +215,38 @@ export async function generatePDF(project: BookProject): Promise<Blob> {
           lineHeightFactor: 1.2,
         });
         currentY += sectionLines.length * 16 * 1.2 + 20;
+      }
+      
+      // Add section images if they exist
+      if (section.images && section.images.length > 0) {
+        for (const img of section.images) {
+          try {
+            const imageUrl = await getMediaAsDataURL(img.id);
+            if (imageUrl) {
+              const imgWidth = 120;
+              const imgHeight = 120;
+              checkPageBreak(imgHeight + 30);
+              const imgX = getTextX(isOddPage);
+              doc.addImage(imageUrl, "PNG", imgX, currentY, imgWidth, imgHeight);
+              currentY += imgHeight + 10;
+              
+              // Add caption if available
+              if (img.caption) {
+                doc.setFontSize(10);
+                doc.setFont("times", "italic");
+                const captionLines = doc.splitTextToSize(img.caption, getTextWidth());
+                doc.text(captionLines, getTextX(isOddPage), currentY, {
+                  lineHeightFactor: 1.2,
+                });
+                currentY += captionLines.length * 10 * 1.2 + 10;
+              } else {
+                currentY += 10;
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to add section image:`, err);
+          }
+        }
       }
 
       // Section content
@@ -210,8 +282,8 @@ export async function generatePDF(project: BookProject): Promise<Blob> {
           currentY += lines.length * 12 * 1.5 + 10;
         });
       }
-    });
-  });
+    }
+  }
 
   // Convert to blob
   const pdfBlob = doc.output("blob");

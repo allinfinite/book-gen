@@ -4,7 +4,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Bold,
   Italic,
@@ -14,12 +14,30 @@ import {
   Heading2,
   Undo,
   Redo,
+  Sparkles,
 } from "lucide-react";
+import { EditorBubbleMenu } from "./EditorBubbleMenu";
+import { useProjectStore } from "@/store/useProjectStore";
 
 interface ChapterEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  onAIAssistClick?: () => void;
+  onRewritePreview?: (
+    preview: {
+      mode: "rewrite" | "generate";
+      isGenerating: boolean;
+      generatedText: string;
+      error?: string;
+      waitingForPrompt?: boolean;
+      onSubmitPrompt?: (prompt: string) => void;
+    } | null,
+    handlers?: {
+      onAccept: () => void;
+      onReject: () => void;
+    }
+  ) => void;
 }
 
 /**
@@ -105,7 +123,22 @@ export function ChapterEditor({
   content,
   onChange,
   placeholder = "Start writing your chapter...",
+  onAIAssistClick,
+  onRewritePreview,
 }: ChapterEditorProps) {
+  const currentProject = useProjectStore((state) => state.currentProject);
+  
+  // Bubble menu state
+  const [bubbleMenuMode, setBubbleMenuMode] = useState<"rewrite" | "generate" | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedText, setGeneratedText] = useState("");
+  const [selectedRange, setSelectedRange] = useState<{ from: number; to: number } | null>(null);
+  const [generationError, setGenerationError] = useState<string | undefined>();
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [waitingForPrompt, setWaitingForPrompt] = useState(false);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const acceptRejectHandlersRef = useRef<{ onAccept: () => void; onReject: () => void } | null>(null);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -128,6 +161,44 @@ export function ChapterEditor({
       const html = editor.getHTML();
       onChange(html);
     },
+    onSelectionUpdate: ({ editor }) => {
+      // Update bubble menu visibility based on selection
+      const { from, to, empty } = editor.state.selection;
+      
+      // Calculate menu position
+      if (typeof window !== "undefined" && editorContainerRef.current) {
+        const { view } = editor;
+        const coords = view.coordsAtPos(from);
+        const editorRect = editorContainerRef.current.getBoundingClientRect();
+        
+        // Position relative to editor container
+        const top = coords.top - editorRect.top - 50; // 50px above selection
+        const left = coords.left - editorRect.left;
+        
+        setMenuPosition({ top, left });
+      }
+      
+      if (empty) {
+        // Check if cursor is in an empty paragraph
+        const node = editor.state.doc.nodeAt(from);
+        if (node && node.type.name === "paragraph" && node.content.size === 0) {
+          setBubbleMenuMode("generate");
+        } else {
+          setBubbleMenuMode(null);
+          setMenuPosition(null);
+        }
+      } else {
+        // Text is selected
+        setBubbleMenuMode("rewrite");
+        setSelectedRange({ from, to });
+      }
+      
+      // Reset state when selection changes
+      if (!isGenerating && !waitingForPrompt) {
+        setGeneratedText("");
+        setGenerationError(undefined);
+      }
+    },
     editorProps: {
       attributes: {
         class: "prose prose-sm max-w-none focus:outline-none min-h-[600px] p-4",
@@ -148,6 +219,233 @@ export function ChapterEditor({
       editor.commands.setContent(htmlContent, { emitUpdate: false });
     }
   }, [content, editor]);
+
+  // Notify parent of preview state changes
+  useEffect(() => {
+    if (onRewritePreview) {
+      if (waitingForPrompt || isGenerating || generatedText || generationError) {
+        onRewritePreview(
+          {
+            mode: bubbleMenuMode || "rewrite",
+            isGenerating,
+            generatedText,
+            error: generationError,
+            waitingForPrompt,
+            onSubmitPrompt: handleSubmitPrompt,
+          },
+          acceptRejectHandlersRef.current || undefined
+        );
+      } else {
+        onRewritePreview(null);
+      }
+    }
+  }, [waitingForPrompt, isGenerating, generatedText, generationError, bubbleMenuMode, onRewritePreview]);
+
+  // Handler functions
+  const handleRewriteClick = () => {
+    // Set waiting state and let parent know to show prompt in sidebar
+    setWaitingForPrompt(true);
+    // Trigger sidebar opening through the parent
+    onAIAssistClick?.();
+  };
+
+  const handleGenerateClick = () => {
+    // Set waiting state and let parent know to show prompt in sidebar
+    setWaitingForPrompt(true);
+    // Trigger sidebar opening through the parent
+    onAIAssistClick?.();
+  };
+
+  // Export this function so parent can call it when user submits prompt from sidebar
+  const handleSubmitPrompt = async (prompt: string) => {
+    setWaitingForPrompt(false);
+    if (!editor || !currentProject) return;
+    
+    setIsGenerating(true);
+    setGenerationError(undefined);
+    
+    try {
+      // Get reference documents that are enabled for generation
+      const enabledRefDocs = currentProject.referenceDocuments?.filter(
+        (doc) => doc.includeInGeneration
+      );
+
+      if (bubbleMenuMode === "rewrite" && selectedRange) {
+        // Get selected text
+        const { from, to } = selectedRange;
+        const selectedText = editor.state.doc.textBetween(from, to);
+        
+        // Call API
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            task: "rewrite",
+            project: currentProject,
+            excerpt: selectedText,
+            userPrompt: prompt,
+            referenceDocuments: enabledRefDocs,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to generate rewrite");
+        }
+
+        // Stream the response
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let result = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+                if (parsed.content) {
+                  result += parsed.content;
+                  setGeneratedText(result);
+                  console.log("Generated text updated (rewrite):", result.length, "chars");
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+        
+        // Log final result for rewrite
+        console.log("Rewrite complete. Total text:", result.length, "chars");
+        console.log("Final rewrite text:", result);
+      } else if (bubbleMenuMode === "generate") {
+        // Get surrounding context (previous paragraph if any)
+        const { from } = editor.state.selection;
+        const contextFrom = Math.max(0, from - 500); // Get up to 500 chars before
+        const contextText = editor.state.doc.textBetween(contextFrom, from);
+        
+        // Call API
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            task: "inline_generate",
+            project: currentProject,
+            context: contextText,
+            userPrompt: prompt,
+            referenceDocuments: enabledRefDocs,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to generate text");
+        }
+
+        // Stream the response
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let result = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+                if (parsed.content) {
+                  result += parsed.content;
+                  setGeneratedText(result);
+                  console.log("Generated text updated:", result.length, "chars");
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+        
+        // Log final result for generate
+        console.log("Generate complete. Total text:", result.length, "chars");
+        console.log("Final generated text:", result);
+      }
+    } catch (error) {
+      console.error("Generation error:", error);
+      setGenerationError(error instanceof Error ? error.message : "Failed to generate");
+    } finally {
+      setIsGenerating(false);
+      console.log("isGenerating set to false, generatedText:", generatedText);
+    }
+  };
+
+  const handleAcceptRewrite = () => {
+    if (!editor || !generatedText) return;
+    
+    // Convert plain text to HTML paragraphs
+    const htmlContent = textToHtml(generatedText);
+    
+    if (bubbleMenuMode === "rewrite" && selectedRange) {
+      // Replace selected text
+      const { from, to } = selectedRange;
+      
+      // Delete the selected range and insert new content
+      editor
+        .chain()
+        .focus()
+        .setTextSelection({ from, to })
+        .deleteSelection()
+        .insertContent(htmlContent)
+        .run();
+    } else if (bubbleMenuMode === "generate") {
+      // Insert at cursor position
+      editor.chain().focus().insertContent(htmlContent).run();
+    }
+    
+    // Reset state
+    setGeneratedText("");
+    setBubbleMenuMode(null);
+    setSelectedRange(null);
+    setMenuPosition(null);
+    setWaitingForPrompt(false);
+  };
+
+  const handleRejectRewrite = () => {
+    setGeneratedText("");
+    setGenerationError(undefined);
+    setWaitingForPrompt(false);
+    // Keep bubble menu open unless user clicks away
+  };
+
+  // Store accept/reject handlers
+  acceptRejectHandlersRef.current = {
+    onAccept: handleAcceptRewrite,
+    onReject: handleRejectRewrite,
+  };
 
   if (!editor) {
     return null;
@@ -240,10 +538,45 @@ export function ChapterEditor({
         >
           <Redo className="w-4 h-4" />
         </button>
+
+        {/* AI Assistant Button */}
+        {onAIAssistClick && (
+          <>
+            <div className="flex-1" />
+            <button
+              onClick={onAIAssistClick}
+              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center gap-1.5"
+              title="AI Assistant"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI Assistant
+            </button>
+          </>
+        )}
       </div>
 
       {/* Editor Content */}
-      <EditorContent editor={editor} />
+      <div ref={editorContainerRef} className="relative">
+        <EditorContent editor={editor} />
+        
+        {/* Custom Floating Menu for Rewrite/Generate */}
+        {editor && bubbleMenuMode && menuPosition && (
+          <div
+            className="absolute z-50"
+            style={{
+              top: `${menuPosition.top}px`,
+              left: `${menuPosition.left}px`,
+            }}
+          >
+            <EditorBubbleMenu
+              mode={bubbleMenuMode}
+              onRewriteClick={handleRewriteClick}
+              onGenerateClick={handleGenerateClick}
+            />
+          </div>
+        )}
+        
+      </div>
     </div>
   );
 }

@@ -11,6 +11,16 @@ export interface MediaBlob {
   meta?: Record<string, any>;
 }
 
+// Document Store Interface
+export interface DocumentBlob {
+  id: string;
+  projectId: string;
+  name: string;
+  mime: string;
+  bytes: ArrayBuffer;
+  createdAt: string;
+}
+
 // Snapshot Interface
 export interface ProjectSnapshot {
   id: string;
@@ -25,6 +35,7 @@ export class BookCreatorDB extends Dexie {
   projects!: Table<BookProject, string>;
   media!: Table<MediaBlob, string>;
   snapshots!: Table<ProjectSnapshot, string>;
+  documents!: Table<DocumentBlob, string>;
 
   constructor() {
     super("BookCreatorDB");
@@ -33,6 +44,14 @@ export class BookCreatorDB extends Dexie {
       projects: "meta.id, meta.title, meta.updatedAt",
       media: "id, kind, createdAt",
       snapshots: "id, projectId, timestamp",
+    });
+
+    // Version 2: Add documents table
+    this.version(2).stores({
+      projects: "meta.id, meta.title, meta.updatedAt",
+      media: "id, kind, createdAt",
+      snapshots: "id, projectId, timestamp",
+      documents: "id, projectId, createdAt",
     });
   }
 }
@@ -224,4 +243,41 @@ export async function importDatabase(data: {
   if (data.snapshots) {
     await db.snapshots.bulkPut(data.snapshots);
   }
+}
+
+// Document operations
+export async function saveDocument(
+  id: string,
+  projectId: string,
+  name: string,
+  mime: string,
+  bytes: ArrayBuffer
+): Promise<void> {
+  const documentBlob: DocumentBlob = {
+    id,
+    projectId,
+    name,
+    mime,
+    bytes,
+    createdAt: new Date().toISOString(),
+  };
+  await db.documents.put(documentBlob);
+}
+
+export async function getDocument(id: string): Promise<DocumentBlob | undefined> {
+  return await db.documents.get(id);
+}
+
+export async function getDocumentsByProject(projectId: string): Promise<DocumentBlob[]> {
+  return await db.documents.where("projectId").equals(projectId).toArray();
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  await db.documents.delete(id);
+}
+
+export async function getDocumentAsBlob(id: string): Promise<Blob | null> {
+  const doc = await getDocument(id);
+  if (!doc) return null;
+  return new Blob([doc.bytes], { type: doc.mime });
 }

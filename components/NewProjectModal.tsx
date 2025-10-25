@@ -7,12 +7,14 @@ import { useProjectStore } from "@/store/useProjectStore";
 import {
   BookProject,
   BookMeta,
+  DocumentRef,
   DEFAULT_STYLE_PRESETS,
   AUDIENCE_OPTIONS,
   GENRE_OPTIONS,
   STRUCTURE_OPTIONS,
 } from "@/types/book";
-import { X } from "lucide-react";
+import { X, ChevronDown, ChevronUp } from "lucide-react";
+import { DocumentUpload } from "./DocumentUpload";
 
 export function NewProjectModal() {
   const router = useRouter();
@@ -33,6 +35,11 @@ export function NewProjectModal() {
   const [maxChapterWords, setMaxChapterWords] = useState(5000);
   const [minSectionWords, setMinSectionWords] = useState(500);
   const [maxSectionWords, setMaxSectionWords] = useState(1500);
+  
+  // Document management
+  const [referenceDocuments, setReferenceDocuments] = useState<DocumentRef[]>([]);
+  const [styleDocuments, setStyleDocuments] = useState<DocumentRef[]>([]);
+  const [showDocuments, setShowDocuments] = useState(false);
 
   if (!showNewProjectModal) return null;
 
@@ -70,6 +77,8 @@ export function NewProjectModal() {
         maxSectionWords,
       },
       stylePresetId,
+      referenceDocuments: referenceDocuments.length > 0 ? referenceDocuments : undefined,
+      styleDocuments: styleDocuments.length > 0 ? styleDocuments : undefined,
     };
 
     setProject(newProject);
@@ -265,6 +274,63 @@ export function NewProjectModal() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Documents Section (Optional) */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowDocuments(!showDocuments)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <div>
+                <label className="block text-sm font-medium">
+                  Documents (Optional)
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload reference materials or writing style samples
+                </p>
+              </div>
+              {showDocuments ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+
+            {showDocuments && (
+              <div className="mt-4 space-y-6">
+                <DocumentUpload
+                  kind="reference"
+                  documents={referenceDocuments}
+                  projectId={undefined}
+                  onAdd={(doc) => setReferenceDocuments([...referenceDocuments, doc])}
+                  onRemove={(id) =>
+                    setReferenceDocuments(referenceDocuments.filter((d) => d.id !== id))
+                  }
+                  onUpdate={(id, updates) =>
+                    setReferenceDocuments(
+                      referenceDocuments.map((d) => (d.id === id ? { ...d, ...updates } : d))
+                    )
+                  }
+                />
+
+                <DocumentUpload
+                  kind="style"
+                  documents={styleDocuments}
+                  projectId={undefined}
+                  onAdd={(doc) => setStyleDocuments([...styleDocuments, doc])}
+                  onRemove={(id) =>
+                    setStyleDocuments(styleDocuments.filter((d) => d.id !== id))
+                  }
+                  onUpdate={(id, updates) =>
+                    setStyleDocuments(
+                      styleDocuments.map((d) => (d.id === id ? { ...d, ...updates } : d))
+                    )
+                  }
+                />
+              </div>
+            )}
           </div>
         </div>
 

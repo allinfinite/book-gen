@@ -6,11 +6,12 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { ArrowLeft, FileJson, FileText, Download, BookOpen, FileType } from "lucide-react";
 import { generateEPUB, downloadEPUB } from "@/lib/epub/generator";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
+import { generateDOCX, downloadDOCX } from "@/lib/docx/generator";
 
 export default function ExportPage() {
   const router = useRouter();
   const currentProject = useProjectStore((state) => state.currentProject);
-  const [exportFormat, setExportFormat] = useState<"json" | "epub" | "pdf">("json");
+  const [exportFormat, setExportFormat] = useState<"json" | "epub" | "pdf" | "docx">("json");
   const [isExporting, setIsExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<string>("");
 
@@ -55,6 +56,12 @@ export default function ExportPage() {
         const pdfBlob = await generatePDF(currentProject);
         downloadPDF(pdfBlob, filename);
         setExportStatus("PDF export complete! Ready for Amazon KDP.");
+      } else if (exportFormat === "docx") {
+        setExportStatus("Generating Word document (.docx)...");
+        // Generate and download DOCX
+        const docxBlob = await generateDOCX(currentProject);
+        downloadDOCX(docxBlob, filename);
+        setExportStatus("Word document export complete!");
       }
     } catch (error) {
       console.error("Export failed:", error);
@@ -136,6 +143,24 @@ export default function ExportPage() {
                   </div>
                 </div>
               </label>
+
+              <label className="flex items-center gap-3 p-4 border border-input rounded-md cursor-pointer hover:bg-accent">
+                <input
+                  type="radio"
+                  name="format"
+                  value="docx"
+                  checked={exportFormat === "docx"}
+                  onChange={(e) => setExportFormat("docx")}
+                  className="w-4 h-4"
+                />
+                <FileText className="w-5 h-5 text-primary" />
+                <div className="flex-1">
+                  <div className="font-medium">Word Document (.docx)</div>
+                  <div className="text-sm text-muted-foreground">
+                    Microsoft Word format with all images included. Perfect for editing, sharing, or further formatting in Word or Google Docs.
+                  </div>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -184,14 +209,18 @@ export default function ExportPage() {
             {isExporting ? "Exporting..." : `Export as ${exportFormat.toUpperCase()}`}
           </button>
 
-          {/* KDP Info */}
-          {(exportFormat === "epub" || exportFormat === "pdf") && !isExporting && (
+          {/* Format Info */}
+          {(exportFormat === "epub" || exportFormat === "pdf" || exportFormat === "docx") && !isExporting && (
             <div className="mt-4 p-4 bg-muted/50 rounded-md text-sm">
-              <h3 className="font-semibold mb-2">📚 Amazon KDP Ready</h3>
+              <h3 className="font-semibold mb-2">
+                {exportFormat === "docx" ? "📝 Editable Format" : "📚 Amazon KDP Ready"}
+              </h3>
               <p className="text-muted-foreground">
                 {exportFormat === "epub" 
                   ? "This EPUB is formatted to Amazon Kindle Direct Publishing standards. Upload directly to KDP for e-book distribution."
-                  : "This PDF uses KDP's standard 6×9\" trade paperback format with proper margins and bleeds. Upload to KDP for print-on-demand paperback distribution."}
+                  : exportFormat === "pdf"
+                  ? "This PDF uses KDP's standard 6×9\" trade paperback format with proper margins and bleeds. Upload to KDP for print-on-demand paperback distribution."
+                  : "This Word document includes all your content and images. Open in Microsoft Word, Google Docs, or any compatible word processor for further editing."}
               </p>
             </div>
           )}

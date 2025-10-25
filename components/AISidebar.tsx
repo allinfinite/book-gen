@@ -11,9 +11,20 @@ interface AISidebarProps {
   chapterId: string;
   sectionId: string | null;
   onContentGenerated?: (content: string) => void;
+  // Rewrite/Generate preview
+  rewritePreview?: {
+    mode: "rewrite" | "generate";
+    isGenerating: boolean;
+    generatedText: string;
+    error?: string;
+    waitingForPrompt?: boolean;
+    onSubmitPrompt?: (prompt: string) => void;
+    onAccept?: () => void;
+    onReject?: () => void;
+  } | null;
 }
 
-export function AISidebar({ chapterId, sectionId, onContentGenerated }: AISidebarProps) {
+export function AISidebar({ chapterId, sectionId, onContentGenerated, rewritePreview }: AISidebarProps) {
   const currentProject = useProjectStore((state) => state.currentProject);
   const updateChapter = useProjectStore((state) => state.updateChapter);
   const isOnline = useUIStore((state) => state.isOnline);
@@ -21,6 +32,7 @@ export function AISidebar({ chapterId, sectionId, onContentGenerated }: AISideba
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
+  const [rewritePrompt, setRewritePrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(
     null
@@ -52,6 +64,11 @@ export function AISidebar({ chapterId, sectionId, onContentGenerated }: AISideba
     const controller = new AbortController();
     setAbortController(controller);
 
+    // Get reference documents that are enabled for generation
+    const referenceDocuments = currentProject.referenceDocuments?.filter(
+      (doc) => doc.includeInGeneration
+    );
+
     try {
       await streamGenerate(
         {
@@ -59,6 +76,7 @@ export function AISidebar({ chapterId, sectionId, onContentGenerated }: AISideba
           project: currentProject,
           targetId: chapterId,
           userBrief: `${section.title}\n${userPrompt}`,
+          referenceDocuments,
         },
         {
           onContent: (content) => {
@@ -121,6 +139,93 @@ export function AISidebar({ chapterId, sectionId, onContentGenerated }: AISideba
           </div>
         )}
       </div>
+
+      {/* Rewrite/Generate Preview */}
+      {rewritePreview && (
+        <div className="p-4 border-b border-border">
+          <div className="mb-3">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Wand2 className="w-4 h-4" />
+              {rewritePreview.mode === "rewrite" ? "Rewrite Text" : "Generate Text"}
+            </h4>
+          </div>
+
+          {/* Prompt Input */}
+          {rewritePreview.waitingForPrompt && (
+            <div className="space-y-3 mb-4">
+              <label className="block text-sm font-medium">
+                What would you like to do?
+              </label>
+              <textarea
+                value={rewritePrompt}
+                onChange={(e) => setRewritePrompt(e.target.value)}
+                placeholder={
+                  rewritePreview.mode === "rewrite"
+                    ? "e.g., Make this more concise"
+                    : "e.g., Add a transition paragraph"
+                }
+                className="w-full px-3 py-2 border border-input rounded-md bg-background resize-none"
+                rows={3}
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  if (rewritePrompt.trim() && rewritePreview.onSubmitPrompt) {
+                    rewritePreview.onSubmitPrompt(rewritePrompt.trim());
+                    setRewritePrompt("");
+                  }
+                }}
+                disabled={!rewritePrompt.trim()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Wand2 className="w-4 h-4" />
+                <span>Generate</span>
+              </button>
+            </div>
+          )}
+
+          {rewritePreview.isGenerating && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Generating...</span>
+            </div>
+          )}
+
+          {rewritePreview.error && (
+            <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md mb-3">
+              {rewritePreview.error}
+            </div>
+          )}
+
+          {!rewritePreview.isGenerating && rewritePreview.generatedText && !rewritePreview.error && (
+            <div className="border border-border rounded-md overflow-hidden">
+              <div className="p-3 max-h-96 overflow-y-auto bg-accent/20">
+                <pre className="text-sm whitespace-pre-wrap font-sans">
+                  {rewritePreview.generatedText}
+                </pre>
+              </div>
+              <div className="p-3 border-t border-border flex gap-2">
+                <button
+                  onClick={rewritePreview.onAccept}
+                  disabled={!rewritePreview.onAccept}
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>✓</span>
+                  Accept
+                </button>
+                <button
+                  onClick={rewritePreview.onReject}
+                  disabled={!rewritePreview.onReject}
+                  className="flex-1 px-4 py-2 border border-input rounded-md hover:bg-accent flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <X className="w-4 h-4" />
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {!sectionId ? (
         <div className="p-4 text-center text-muted-foreground text-sm">

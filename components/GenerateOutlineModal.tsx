@@ -36,12 +36,18 @@ export function GenerateOutlineModal({ isOpen, onClose }: GenerateOutlineModalPr
 
     let fullContent = "";
 
+    // Get reference documents that are enabled for generation
+    const referenceDocuments = currentProject.referenceDocuments?.filter(
+      (doc) => doc.includeInGeneration
+    );
+
     try {
       await streamGenerate(
         {
           task: "outline",
           project: currentProject,
           userBrief: brief,
+          referenceDocuments,
         },
         {
           onContent: (content) => {

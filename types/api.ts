@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BookProject } from "./book";
+import { BookProject, DocumentRef, DocumentRefSchema } from "./book";
 
 // Transcription API
 export const TranscribeRequestSchema = z.object({
@@ -29,6 +29,7 @@ export const GenerateTaskSchema = z.enum([
   "section_draft",
   "sections", // Generate all sections for a chapter
   "rewrite",
+  "inline_generate",
   "style_check",
 ]);
 
@@ -39,7 +40,10 @@ export const GenerateRequestSchema = z.object({
   project: z.custom<Partial<BookProject>>(),
   targetId: z.string().optional(),
   userBrief: z.string().optional(),
-  context: z.any().optional(), // For sections generation
+  context: z.any().optional(), // For sections generation or inline generation
+  excerpt: z.string().optional(), // For rewrite task
+  userPrompt: z.string().optional(), // For rewrite and inline_generate
+  referenceDocuments: z.array(DocumentRefSchema).optional(),
   controls: z
     .object({
       temperature: z.number().optional(),
@@ -53,7 +57,10 @@ export type GenerateRequest = {
   project: Partial<BookProject>;
   targetId?: string;
   userBrief?: string;
-  context?: any; // For sections generation
+  context?: any; // For sections generation or inline generation
+  excerpt?: string; // For rewrite task
+  userPrompt?: string; // For rewrite and inline_generate
+  referenceDocuments?: DocumentRef[];
   controls?: {
     temperature?: number;
     maxTokens?: number;
@@ -89,3 +96,19 @@ export const StyleCheckResponseSchema = z.object({
 });
 
 export type StyleCheckResponse = z.infer<typeof StyleCheckResponseSchema>;
+
+// Style Analysis API
+export const StyleAnalysisRequestSchema = z.object({
+  texts: z.array(z.string()),
+});
+
+export type StyleAnalysisRequest = z.infer<typeof StyleAnalysisRequestSchema>;
+
+export const StyleAnalysisResponseSchema = z.object({
+  pov: z.string(),
+  tense: z.string(),
+  voice: z.string(),
+  patterns: z.array(z.string()),
+});
+
+export type StyleAnalysisResponse = z.infer<typeof StyleAnalysisResponseSchema>;

@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { BookProject } from "@/types/book";
+import { getMedia } from "@/lib/idb";
 
 /**
  * Generate an EPUB 3 file compatible with Amazon KDP standards
@@ -47,7 +48,40 @@ export async function generateEPUB(project: BookProject): Promise<Blob> {
   const copyrightPage = generateCopyrightPage(project);
   oebps.file("copyright.xhtml", copyrightPage);
 
-  // 10. Chapter files
+  // 10. Add images to OEBPS/images folder
+  const imagesFolder = oebps.folder("images")!;
+  const imageIds = new Set<string>();
+  
+  // Collect all image IDs
+  if (project.coverImageId) {
+    imageIds.add(project.coverImageId);
+  }
+  
+  project.chapters.forEach((chapter) => {
+    if (chapter.imageId) {
+      imageIds.add(chapter.imageId);
+    }
+    chapter.sections.forEach((section) => {
+      if (section.images) {
+        section.images.forEach((img) => imageIds.add(img.id));
+      }
+    });
+  });
+  
+  // Add all images to the ZIP
+  for (const imageId of imageIds) {
+    try {
+      const mediaBlob = await getMedia(imageId);
+      if (mediaBlob) {
+        const extension = mediaBlob.mime.split("/")[1] || "png";
+        imagesFolder.file(`${imageId}.${extension}`, mediaBlob.bytes);
+      }
+    } catch (err) {
+      console.error(`Failed to add image ${imageId}:`, err);
+    }
+  }
+
+  // 11. Chapter files
   project.chapters.forEach((chapter, index) => {
     const chapterXhtml = generateChapterXhtml(chapter, index, project);
     oebps.file(`chapter${index + 1}.xhtml`, chapterXhtml);
@@ -68,9 +102,31 @@ function generateContentOpf(project: BookProject): string {
     `<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>`,
     `<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
     `<item id="stylesheet" href="stylesheet.css" media-type="text/css"/>`,
-    `<item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>`,
+    `<item id="title" href="title.xhtml" media-type="application/xhtml+xml"${project.coverImageId ? ' properties="cover-image"' : ""}/>`,
     `<item id="copyright" href="copyright.xhtml" media-type="application/xhtml+xml"/>`,
   ];
+  
+  // Add image items
+  const imageIds = new Set<string>();
+  if (project.coverImageId) {
+    imageIds.add(project.coverImageId);
+  }
+  project.chapters.forEach((chapter) => {
+    if (chapter.imageId) {
+      imageIds.add(chapter.imageId);
+    }
+    chapter.sections.forEach((section) => {
+      if (section.images) {
+        section.images.forEach((img) => imageIds.add(img.id));
+      }
+    });
+  });
+  
+  imageIds.forEach((imageId) => {
+    manifestItems.push(
+      `<item id="img_${imageId}" href="images/${imageId}.png" media-type="image/png"/>`
+    );
+  });
 
   // Add chapter items
   for (let i = 0; i < chapterCount; i++) {
@@ -323,6 +379,46 @@ blockquote {
   page-break-after: always;
 }
 
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+}
+
+.cover-image {
+  max-width: 80%;
+  margin: 2em auto;
+}
+
+.chapter-image {
+  max-width: 60%;
+  margin: 1.5em auto;
+}
+
+.section-image {
+  text-align: center;
+  margin: 1.5em auto;
+}
+
+.section-image img {
+  max-width: 70%;
+}
+
+.image-caption {
+  font-size: 0.9em;
+  font-style: italic;
+  text-align: center;
+  margin-top: 0.5em;
+  text-indent: 0;
+}
+
+figure {
+  margin: 1.5em 0;
+  text-align: center;
+}
+
 /* Amazon Kindle specific */
 @media amzn-kf8 {
   body {
@@ -342,6 +438,7 @@ function generateTitlePage(project: BookProject): string {
 </head>
 <body>
   <div class="title-page">
+    ${project.coverImageId ? `<img src="images/${project.coverImageId}.png" alt="Cover" class="cover-image"/>` : ""}
     <h1 class="book-title">${escapeXml(project.meta.title)}</h1>
     ${project.meta.subtitle ? `<h2 class="book-subtitle">${escapeXml(project.meta.subtitle)}</h2>` : ""}
     <p class="book-author">by ${escapeXml(project.meta.authorName || "Unknown Author")}</p>
@@ -385,13 +482,34 @@ function generateChapterXhtml(
       
       // Clean up the HTML to be valid XHTML
       content = cleanHtmlForEpub(content);
+      
+      // Add section images
+      let imagesHtml = "";
+      if (section.images && section.images.length > 0) {
+        imagesHtml = section.images
+          .map((img: any) => {
+            const caption = img.caption ? `<p class="image-caption">${escapeXml(img.caption)}</p>` : "";
+            const alt = img.altText || "Section image";
+            return `<figure class="section-image">
+              <img src="images/${img.id}.png" alt="${escapeXml(alt)}"/>
+              ${caption}
+            </figure>`;
+          })
+          .join("\n");
+      }
 
       return `    <section class="section">
       <h2 class="section-title">${escapeXml(section.title)}</h2>
+      ${imagesHtml}
       ${content}
     </section>`;
     })
     .join("\n\n");
+  
+  // Add chapter image
+  const chapterImageHtml = chapter.imageId
+    ? `<img src="images/${chapter.imageId}.png" alt="Chapter illustration" class="chapter-image"/>`
+    : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -404,6 +522,7 @@ function generateChapterXhtml(
 <body>
   <div class="chapter">
     <h1 class="chapter-title">Chapter ${index + 1}: ${escapeXml(chapter.title)}</h1>
+    ${chapterImageHtml}
     ${sectionsHtml}
   </div>
 </body>

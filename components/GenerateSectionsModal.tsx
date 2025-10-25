@@ -55,6 +55,11 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
 
     let fullContent = "";
 
+    // Get reference documents that are enabled for generation
+    const referenceDocuments = currentProject.referenceDocuments?.filter(
+      (doc) => doc.includeInGeneration
+    );
+
     try {
       await streamGenerate(
         {
@@ -67,6 +72,7 @@ export function GenerateSectionsModal({ isOpen, onClose, chapterId }: GenerateSe
             existingSections: chapter.sections.map((s) => s.title),
             userBrief: brief,
           },
+          referenceDocuments,
         },
         {
           onChunk: (chunk) => {

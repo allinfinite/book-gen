@@ -42,11 +42,10 @@ export async function POST(req: NextRequest) {
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "dall-e-3",
+            model: "gpt-image-1",
             prompt,
             n: 1,
             size: "1024x1024",
-            response_format: "url",
           }),
         });
         break;
@@ -77,25 +76,21 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await response.json();
-    const imageUrl = result.data[0]?.url;
+    const b64Data = result.data[0]?.b64_json;
 
-    if (!imageUrl) {
+    if (!b64Data) {
       return NextResponse.json(
-        { error: "No image URL returned" },
+        { error: "No image data returned" },
         { status: 500 }
       );
     }
 
-    // Fetch the image and return it as bytes
+    // Return the base64 data directly
     // The client will store it in IndexedDB
-    const imageResponse = await fetch(imageUrl);
-    const imageBlob = await imageResponse.blob();
-    const arrayBuffer = await imageBlob.arrayBuffer();
-
     return NextResponse.json({
       mediaId,
-      data: Buffer.from(arrayBuffer).toString("base64"),
-      mime: imageBlob.type,
+      data: b64Data,
+      mime: "image/png",
     });
   } catch (error) {
     console.error("Image generation error:", error);

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { BookProject, Chapter, Section, OutlineNode, ChangeRecord } from "@/types/book";
+import { BookProject, Chapter, Section, OutlineNode, ChangeRecord, DocumentRef, CustomStyleAnalysis, MediaRef } from "@/types/book";
 import { saveProject, getProject, createSnapshot, deleteProject as deleteProjectFromDB } from "@/lib/idb";
 
 interface ProjectState {
@@ -28,6 +28,18 @@ interface ProjectState {
   addSection: (chapterId: string, section: Section) => void;
   updateSection: (chapterId: string, sectionId: string, updates: Partial<Section>) => void;
   deleteSection: (chapterId: string, sectionId: string) => void;
+
+  // Document operations
+  addDocument: (document: DocumentRef, kind: "reference" | "style") => void;
+  removeDocument: (documentId: string, kind: "reference" | "style") => void;
+  updateDocument: (documentId: string, updates: Partial<DocumentRef>, kind: "reference" | "style") => void;
+  setCustomStyleAnalysis: (analysis: CustomStyleAnalysis | undefined) => void;
+
+  // Image operations
+  updateCoverImage: (imageId: string | undefined) => void;
+  updateChapterImage: (chapterId: string, imageId: string | undefined) => void;
+  addSectionImage: (chapterId: string, sectionId: string, mediaRef: MediaRef) => void;
+  removeSectionImage: (chapterId: string, sectionId: string, imageId: string) => void;
 
   // History
   addChangeRecord: (record: Omit<ChangeRecord, "id" | "timestamp">) => void;
@@ -287,6 +299,183 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           ? {
               ...ch,
               sections: ch.sections.filter((sec) => sec.id !== sectionId),
+            }
+          : ch
+      ),
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  addDocument: (document, kind) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const field = kind === "reference" ? "referenceDocuments" : "styleDocuments";
+    const existingDocs = currentProject[field] || [];
+
+    const updated: BookProject = {
+      ...currentProject,
+      [field]: [...existingDocs, document],
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  removeDocument: (documentId, kind) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const field = kind === "reference" ? "referenceDocuments" : "styleDocuments";
+    const existingDocs = currentProject[field] || [];
+
+    const updated: BookProject = {
+      ...currentProject,
+      [field]: existingDocs.filter((doc) => doc.id !== documentId),
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  updateDocument: (documentId, updates, kind) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const field = kind === "reference" ? "referenceDocuments" : "styleDocuments";
+    const existingDocs = currentProject[field] || [];
+
+    const updated: BookProject = {
+      ...currentProject,
+      [field]: existingDocs.map((doc) =>
+        doc.id === documentId ? { ...doc, ...updates } : doc
+      ),
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  setCustomStyleAnalysis: (analysis) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const updated: BookProject = {
+      ...currentProject,
+      customStyleAnalysis: analysis,
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  updateCoverImage: (imageId) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const updated: BookProject = {
+      ...currentProject,
+      coverImageId: imageId,
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  updateChapterImage: (chapterId, imageId) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const updated: BookProject = {
+      ...currentProject,
+      chapters: currentProject.chapters.map((ch) =>
+        ch.id === chapterId ? { ...ch, imageId } : ch
+      ),
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  addSectionImage: (chapterId, sectionId, mediaRef) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const updated: BookProject = {
+      ...currentProject,
+      chapters: currentProject.chapters.map((ch) =>
+        ch.id === chapterId
+          ? {
+              ...ch,
+              sections: ch.sections.map((sec) =>
+                sec.id === sectionId
+                  ? { 
+                      ...sec, 
+                      images: [...(sec.images || []), mediaRef] 
+                    }
+                  : sec
+              ),
+            }
+          : ch
+      ),
+      meta: {
+        ...currentProject.meta,
+        updatedAt: new Date().toISOString(),
+        version: currentProject.meta.version + 1,
+      },
+    };
+    set({ currentProject: updated });
+    get().save();
+  },
+
+  removeSectionImage: (chapterId, sectionId, imageId) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    const updated: BookProject = {
+      ...currentProject,
+      chapters: currentProject.chapters.map((ch) =>
+        ch.id === chapterId
+          ? {
+              ...ch,
+              sections: ch.sections.map((sec) =>
+                sec.id === sectionId
+                  ? {
+                      ...sec,
+                      images: (sec.images || []).filter((img) => img.id !== imageId),
+                    }
+                  : sec
+              ),
             }
           : ch
       ),

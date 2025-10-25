@@ -6,6 +6,7 @@ import {
   buildSectionDraftPrompt,
   buildSectionsGeneratorPrompt,
   buildRewritePrompt,
+  buildInlineGeneratePrompt,
   buildStyleCheckPrompt,
   buildReviseOutlinePrompt,
 } from "@/lib/ai/prompts";
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { task, project, targetId, userBrief, controls, context } = parsed.data;
+    const { task, project, targetId, userBrief, controls, context, referenceDocuments, excerpt, userPrompt: customPrompt } = parsed.data;
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     switch (task) {
       case "outline":
-        const outlinePrompts = buildOutlinePrompt(project, userBrief);
+        const outlinePrompts = buildOutlinePrompt(project, userBrief, referenceDocuments);
         systemPrompt = outlinePrompts.system;
         userPrompt = outlinePrompts.user;
         // Use structured output for reliable JSON
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
         if (!targetId) {
           throw new Error("Chapter ID required");
         }
-        const chapterPrompts = buildChapterDraftPrompt(project, targetId, userBrief);
+        const chapterPrompts = buildChapterDraftPrompt(project, targetId, userBrief, referenceDocuments);
         systemPrompt = chapterPrompts.system;
         userPrompt = chapterPrompts.user;
         break;
@@ -156,7 +157,8 @@ export async function POST(req: NextRequest) {
           project,
           targetId,
           userBrief.split("\n")[0], // First line as title
-          userBrief
+          userBrief,
+          referenceDocuments
         );
         systemPrompt = sectionPrompts.system;
         userPrompt = sectionPrompts.user;
@@ -169,7 +171,8 @@ export async function POST(req: NextRequest) {
         const sectionsPrompts = buildSectionsGeneratorPrompt(
           project,
           targetId,
-          context || {}
+          context || {},
+          referenceDocuments
         );
         systemPrompt = sectionsPrompts.system;
         userPrompt = sectionsPrompts.user;
@@ -203,19 +206,31 @@ export async function POST(req: NextRequest) {
         break;
 
       case "rewrite":
-        if (!userBrief) {
-          throw new Error("Text excerpt required");
+        if (!excerpt || !customPrompt) {
+          throw new Error("Text excerpt and user prompt required");
         }
-        // Extract operation from userBrief (format: "operation:excerpt")
-        const [operation, ...excerptParts] = userBrief.split(":");
-        const excerpt = excerptParts.join(":");
         const rewritePrompts = buildRewritePrompt(
           project,
           excerpt,
-          operation as any
+          customPrompt,
+          referenceDocuments
         );
         systemPrompt = rewritePrompts.system;
         userPrompt = rewritePrompts.user;
+        break;
+
+      case "inline_generate":
+        if (!customPrompt) {
+          throw new Error("User prompt required");
+        }
+        const generatePrompts = buildInlineGeneratePrompt(
+          project,
+          context || "",
+          customPrompt,
+          referenceDocuments
+        );
+        systemPrompt = generatePrompts.system;
+        userPrompt = generatePrompts.user;
         break;
 
       case "style_check":
