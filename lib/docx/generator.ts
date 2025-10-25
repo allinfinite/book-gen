@@ -32,6 +32,15 @@ export async function generateDOCX(project: BookProject): Promise<Blob> {
       .trim();
   };
 
+  // Helper to map MIME type to docx image type
+  const getImageType = (mime: string): "png" | "jpg" | "gif" | "bmp" => {
+    if (mime.includes("png")) return "png";
+    if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+    if (mime.includes("gif")) return "gif";
+    if (mime.includes("bmp")) return "bmp";
+    return "png"; // default
+  };
+
   // Title Page
   const titlePageChildren: any[] = [];
 
@@ -44,7 +53,8 @@ export async function generateDOCX(project: BookProject): Promise<Blob> {
           new Paragraph({
             children: [
               new ImageRun({
-                data: mediaBlob.bytes,
+                type: getImageType(mediaBlob.mime),
+                data: new Uint8Array(mediaBlob.bytes),
                 transformation: {
                   width: 300,
                   height: 450,
@@ -179,7 +189,8 @@ export async function generateDOCX(project: BookProject): Promise<Blob> {
             new Paragraph({
               children: [
                 new ImageRun({
-                  data: mediaBlob.bytes,
+                  type: getImageType(mediaBlob.mime),
+                  data: new Uint8Array(mediaBlob.bytes),
                   transformation: {
                     width: 250,
                     height: 250,
@@ -219,7 +230,8 @@ export async function generateDOCX(project: BookProject): Promise<Blob> {
                 new Paragraph({
                   children: [
                     new ImageRun({
-                      data: mediaBlob.bytes,
+                      type: getImageType(mediaBlob.mime),
+                      data: new Uint8Array(mediaBlob.bytes),
                       transformation: {
                         width: 200,
                         height: 200,
