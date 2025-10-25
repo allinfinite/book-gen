@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/store/useProjectStore";
-import { ArrowLeft, FileJson, FileText, Download } from "lucide-react";
+import { ArrowLeft, FileJson, FileText, Download, BookOpen, FileType } from "lucide-react";
+import { generateEPUB, downloadEPUB } from "@/lib/epub/generator";
+import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 
 export default function ExportPage() {
   const router = useRouter();
   const currentProject = useProjectStore((state) => state.currentProject);
   const [exportFormat, setExportFormat] = useState<"json" | "epub" | "pdf">("json");
   const [isExporting, setIsExporting] = useState(false);
+  const [exportStatus, setExportStatus] = useState<string>("");
 
   if (!currentProject) {
     return (
@@ -20,27 +23,42 @@ export default function ExportPage() {
   }
 
   async function handleExport() {
+    if (!currentProject) return;
+
     setIsExporting(true);
+    setExportStatus("");
 
     try {
-      if (exportFormat === "json" && currentProject) {
+      const filename = currentProject.meta.title.replace(/[^a-z0-9]/gi, "_");
+
+      if (exportFormat === "json") {
+        setExportStatus("Preparing JSON export...");
         // Export as JSON
         const jsonString = JSON.stringify(currentProject, null, 2);
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${currentProject.meta.title.replace(/[^a-z0-9]/gi, "_")}.book.json`;
+        a.download = `${filename}.book.json`;
         a.click();
         URL.revokeObjectURL(url);
+        setExportStatus("JSON export complete!");
       } else if (exportFormat === "epub") {
-        alert("EPUB export is not yet implemented. Coming soon!");
+        setExportStatus("Generating EPUB (Amazon KDP compatible)...");
+        // Generate and download EPUB
+        const epubBlob = await generateEPUB(currentProject);
+        downloadEPUB(epubBlob, filename);
+        setExportStatus("EPUB export complete! Ready for Amazon KDP.");
       } else if (exportFormat === "pdf") {
-        alert("PDF export is not yet implemented. Coming soon!");
+        setExportStatus("Generating PDF (6x9\" KDP format)...");
+        // Generate and download PDF
+        const pdfBlob = await generatePDF(currentProject);
+        downloadPDF(pdfBlob, filename);
+        setExportStatus("PDF export complete! Ready for Amazon KDP.");
       }
     } catch (error) {
       console.error("Export failed:", error);
-      alert("Export failed. Please try again.");
+      setExportStatus(`Export failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsExporting(false);
     }
@@ -83,7 +101,7 @@ export default function ExportPage() {
                 </div>
               </label>
 
-              <label className="flex items-center gap-3 p-4 border border-input rounded-md cursor-pointer hover:bg-accent opacity-50">
+              <label className="flex items-center gap-3 p-4 border border-input rounded-md cursor-pointer hover:bg-accent">
                 <input
                   type="radio"
                   name="format"
@@ -91,18 +109,17 @@ export default function ExportPage() {
                   checked={exportFormat === "epub"}
                   onChange={(e) => setExportFormat("epub")}
                   className="w-4 h-4"
-                  disabled
                 />
-                <FileText className="w-5 h-5" />
+                <BookOpen className="w-5 h-5 text-primary" />
                 <div className="flex-1">
-                  <div className="font-medium">EPUB 3</div>
+                  <div className="font-medium">EPUB 3 (Amazon KDP)</div>
                   <div className="text-sm text-muted-foreground">
-                    E-book format (Coming Soon)
+                    Professional e-book format compatible with Amazon Kindle, Apple Books, and all major e-readers. Includes TOC, metadata, and KDP-compliant styling.
                   </div>
                 </div>
               </label>
 
-              <label className="flex items-center gap-3 p-4 border border-input rounded-md cursor-pointer hover:bg-accent opacity-50">
+              <label className="flex items-center gap-3 p-4 border border-input rounded-md cursor-pointer hover:bg-accent">
                 <input
                   type="radio"
                   name="format"
@@ -110,13 +127,12 @@ export default function ExportPage() {
                   checked={exportFormat === "pdf"}
                   onChange={(e) => setExportFormat("pdf")}
                   className="w-4 h-4"
-                  disabled
                 />
-                <FileText className="w-5 h-5" />
+                <FileType className="w-5 h-5 text-primary" />
                 <div className="flex-1">
-                  <div className="font-medium">PDF</div>
+                  <div className="font-medium">PDF (6×9" Trade Paperback)</div>
                   <div className="text-sm text-muted-foreground">
-                    Printable document (Coming Soon)
+                    Print-ready PDF with KDP standard 6×9" trim size, proper margins, page numbers, and professional formatting. Ready to upload for paperback printing.
                   </div>
                 </div>
               </label>
@@ -146,14 +162,39 @@ export default function ExportPage() {
             </dl>
           </div>
 
+          {/* Export Status */}
+          {exportStatus && (
+            <div className={`p-4 rounded-md text-sm ${
+              exportStatus.includes("failed") 
+                ? "bg-destructive/10 text-destructive" 
+                : exportStatus.includes("complete")
+                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                : "bg-primary/10 text-primary"
+            }`}>
+              {exportStatus}
+            </div>
+          )}
+
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            <Download className="w-5 h-5" />
+            <Download className={`w-5 h-5 ${isExporting ? "animate-bounce" : ""}`} />
             {isExporting ? "Exporting..." : `Export as ${exportFormat.toUpperCase()}`}
           </button>
+
+          {/* KDP Info */}
+          {(exportFormat === "epub" || exportFormat === "pdf") && !isExporting && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-md text-sm">
+              <h3 className="font-semibold mb-2">📚 Amazon KDP Ready</h3>
+              <p className="text-muted-foreground">
+                {exportFormat === "epub" 
+                  ? "This EPUB is formatted to Amazon Kindle Direct Publishing standards. Upload directly to KDP for e-book distribution."
+                  : "This PDF uses KDP's standard 6×9\" trade paperback format with proper margins and bleeds. Upload to KDP for print-on-demand paperback distribution."}
+              </p>
+            </div>
+          )}
         </div>
       </main>
     </div>
