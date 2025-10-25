@@ -24,6 +24,7 @@ interface ChapterEditorProps {
 
 /**
  * Convert plain text with newlines and markdown to HTML paragraphs for TipTap
+ * Intelligently handles both single and double newlines from AI-generated content
  */
 function textToHtml(text: string): string {
   if (!text) return "";
@@ -33,37 +34,67 @@ function textToHtml(text: string): string {
     return text;
   }
   
-  // Split by double newlines to preserve paragraph breaks
-  const paragraphs = text
-    .split(/\n\n+/) // Split on 2+ newlines
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
+  // Step 1: Normalize line endings and preserve intentional paragraph breaks
+  // Replace Windows line endings and multiple spaces
+  let normalized = text.replace(/\r\n/g, "\n").replace(/  +/g, " ");
   
-  // Convert markdown-like patterns to HTML
-  return paragraphs
-    .map(p => {
-      let html = p;
+  // Step 2: Split into blocks (paragraphs, headings, etc.)
+  // First try double newlines (proper paragraph breaks)
+  let blocks = normalized.split(/\n\n+/);
+  
+  // If no double newlines found, treat each single newline as a paragraph break
+  // This handles AI content that uses single newlines for paragraphs
+  if (blocks.length === 1 && normalized.includes("\n")) {
+    // Check if this looks like prose with single-line paragraphs
+    // (common in AI output) vs. a code block or list
+    const lines = normalized.split("\n");
+    if (lines.length > 1 && !lines[0].trim().startsWith("-") && !lines[0].trim().startsWith("*")) {
+      blocks = lines;
+    }
+  }
+  
+  // Filter out empty blocks
+  blocks = blocks.map(b => b.trim()).filter(b => b.length > 0);
+  
+  // Step 3: Convert each block to HTML
+  return blocks
+    .map(block => {
+      let html = block;
       
-      // Convert markdown headings: ## Heading -> <h2>Heading</h2>
+      // Convert markdown headings: ### Heading -> <h3>Heading</h3>
       if (html.startsWith("### ")) {
-        return `<h3>${html.substring(4)}</h3>`;
+        return `<h3>${html.substring(4).trim()}</h3>`;
       }
       if (html.startsWith("## ")) {
-        return `<h2>${html.substring(3)}</h2>`;
+        return `<h2>${html.substring(3).trim()}</h2>`;
       }
       if (html.startsWith("# ")) {
-        return `<h1>${html.substring(2)}</h1>`;
+        return `<h1>${html.substring(2).trim()}</h1>`;
+      }
+      
+      // Check for bullet lists (lines starting with - or *)
+      if (html.match(/^[-*]\s/m)) {
+        const items = html
+          .split("\n")
+          .filter(line => line.trim().startsWith("-") || line.trim().startsWith("*"))
+          .map(line => line.replace(/^[-*]\s+/, "").trim())
+          .map(item => `<li>${item}</li>`)
+          .join("");
+        return `<ul>${items}</ul>`;
       }
       
       // Convert markdown bold: **text** -> <strong>text</strong>
       html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
       
       // Convert markdown italic: *text* or _text_ -> <em>text</em>
-      // Use underscore for italic to avoid conflicts with bold
-      html = html.replace(/_(.+?)_/g, "<em>$1</em>");
+      html = html.replace(/\*([^*]+?)\*/g, "<em>$1</em>");
+      html = html.replace(/_([^_]+?)_/g, "<em>$1</em>");
       
-      // Replace single newlines with <br> tags
-      html = html.replace(/\n/g, "<br>");
+      // If there are still internal newlines in this block,
+      // replace them with <br> tags (for poetry, addresses, etc.)
+      if (html.includes("\n")) {
+        html = html.replace(/\n/g, "<br>");
+      }
       
       return `<p>${html}</p>`;
     })
