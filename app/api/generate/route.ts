@@ -246,37 +246,76 @@ export async function POST(req: NextRequest) {
         throw new Error("Invalid task");
     }
 
-    // Call OpenAI API with streaming
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        // GPT-5 only supports default temperature (1), don't send custom values
-        ...(DEFAULT_MODEL !== "gpt-5" && {
-          temperature: controls?.temperature ?? DEFAULT_TEMPERATURE,
+    // Call OpenAI API with streaming (with timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+    
+    let response;
+    try {
+      response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: DEFAULT_MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          // GPT-5 only supports default temperature (1), don't send custom values
+          ...(DEFAULT_MODEL !== "gpt-5" && {
+            temperature: controls?.temperature ?? DEFAULT_TEMPERATURE,
+          }),
+          max_completion_tokens: controls?.maxTokens ?? MAX_COMPLETION_TOKENS,
+          stream: true,
+          // Add structured output format if specified
+          ...(responseFormat && { response_format: responseFormat }),
         }),
-        max_completion_tokens: controls?.maxTokens ?? MAX_COMPLETION_TOKENS,
-        stream: true,
-        // Add structured output format if specified
-        ...(responseFormat && { response_format: responseFormat }),
-      }),
-    });
+        signal: controller.signal,
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error("Request timed out. The AI service is taking too long to respond. Please try again.");
+      }
+      throw fetchError;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("OpenAI API error:", error);
+      const errorText = await response.text();
+      console.error("OpenAI API error:", errorText);
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Generation failed";
+      
+      if (response.status === 502 || response.status === 503) {
+        errorMessage = "OpenAI service is temporarily unavailable. Please try again in a moment.";
+      } else if (response.status === 429) {
+        errorMessage = "Rate limit exceeded. Please wait a moment and try again.";
+      } else if (response.status === 401) {
+        errorMessage = "API authentication failed. Please check your API key.";
+      } else if (response.status >= 500) {
+        errorMessage = "OpenAI server error. Please try again shortly.";
+      } else if (errorText.includes("<!DOCTYPE") || errorText.includes("<html")) {
+        // HTML error page (like Cloudflare errors)
+        errorMessage = "Service temporarily unavailable. Please try again in a moment.";
+      } else {
+        try {
+          const parsed = JSON.parse(errorText);
+          errorMessage = parsed.error?.message || errorMessage;
+        } catch {
+          // Not JSON, use default message
+        }
+      }
+      
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ error: "Generation failed" })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`)
           );
           controller.close();
         },
