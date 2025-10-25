@@ -114,7 +114,7 @@ export function ChapterEditor({
     // Compare the HTML content to avoid unnecessary updates
     const currentHtml = editor.getHTML();
     if (htmlContent !== currentHtml) {
-      editor.commands.setContent(htmlContent, false); // false = don't emit update event
+      editor.commands.setContent(htmlContent, { emitUpdate: false });
     }
   }, [content, editor]);
 
