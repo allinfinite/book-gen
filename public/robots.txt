@@ -1,0 +1,13 @@
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Disallow crawling of API routes
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://bookgen.dnalevity.com/sitemap.xml
+
+# Crawl delay (optional, helps prevent overload)
+Crawl-delay: 1
+
