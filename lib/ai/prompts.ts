@@ -133,9 +133,9 @@ Rules:
 - Keep continuity with prior chapters
 - Avoid recap unless necessary
 - Fit within word targets
-- Stay in character with style lock
+- Stay in character with style lock - DO NOT copy style from any reference materials
 - USE CORRECT GRAMMAR: Singular "they" always uses plural verb forms (they do, they are, they have, NOT they does/they is/they has)
-${refContext ? "- When quoting from reference materials, maintain accuracy" : ""}`;
+${refContext ? "- Reference materials are for FACTS only - quote factual content when relevant, but NEVER mimic their writing style" : ""}`;
 
   const priorSummaries = priorChapters
     .map((ch, idx) => `Chapter ${idx + 1}: ${ch.title}\n${ch.synopsis || ""}`)
@@ -185,8 +185,8 @@ ${targets?.minSectionWords ? `- Section words: ${targets.minSectionWords}–${ta
 Grammar Rule (CRITICAL):
 - Singular "they" always uses plural verb forms: they do, they are, they have, they notice, they stand (NOT they does/is/has/notices/stands)
 
-Task: Draft a single section in Markdown. No heading needed (it will be added separately). Match genre conventions.
-${refContext ? "When quoting from reference materials, maintain accuracy." : ""}`;
+Task: Draft a single section in Markdown. No heading needed (it will be added separately). Match genre conventions. Your writing style MUST match the Style Lock above.
+${refContext ? "When using reference materials, quote FACTS only - never copy their writing style." : ""}`;
 
   const user = `Chapter: ${chapter?.title || "Untitled"}
 ${chapter?.synopsis ? `Chapter synopsis: ${chapter.synopsis}` : ""}
@@ -237,13 +237,13 @@ Rules:
 - Each section must have COMPLETE, READY-TO-READ content
 - Match genre conventions and audience expectations
 - Keep continuity and logical flow between sections
-- Stay strictly within style lock (POV, tense, voice)
+- Stay strictly within style lock (POV, tense, voice) - DO NOT copy style from reference materials
 - USE CORRECT GRAMMAR: Singular "they" always uses plural verb forms (they do, they are, they have, NOT they does/they is/they has)
 - Return ONLY valid JSON in the exact format specified
 - Use the structured output format provided
 - Every section MUST have both "title" and "content" fields
 - Content should be substantial prose, not outlines or placeholders
-${refContext ? "- When quoting from reference materials, maintain accuracy" : ""}
+${refContext ? "- Reference materials are for FACTUAL content only - quote facts when relevant, but NEVER mimic their writing style" : ""}
 
 Example format:
 {
@@ -297,8 +297,8 @@ ${preset?.constraints?.length ? `- Constraints: ${preset.constraints.join(", ")}
 Grammar Rule (CRITICAL):
 - Singular "they" always uses plural verb forms: they do, they are, they have, they notice, they stand (NOT they does/is/has/notices/stands)
 
-Task: Apply the author's revision request to the text below. Output ONLY the revised text in plain text format. Do not add any explanations, markdown formatting, or commentary. Just return the revised text that can directly replace the original.
-${refContext ? "\nWhen quoting from reference materials, maintain accuracy." : ""}`;
+Task: Apply the author's revision request to the text below. Output ONLY the revised text in plain text format. Do not add any explanations, markdown formatting, or commentary. Just return the revised text that can directly replace the original. Your writing style MUST match the Style Lock above.
+${refContext ? "\nWhen using reference materials, quote FACTS only - never copy their writing style." : ""}`;
 
   const user = `Original text:
 <<<\n${excerpt}\n>>>
@@ -335,8 +335,8 @@ ${preset?.constraints?.length ? `- Constraints: ${preset.constraints.join(", ")}
 Grammar Rule (CRITICAL):
 - Singular "they" always uses plural verb forms: they do, they are, they have, they notice, they stand (NOT they does/is/has/notices/stands)
 
-Task: Generate new text based on the author's request. Output ONLY the new text in plain text format. Do not add any explanations, markdown formatting, or commentary. Just return the text that can be inserted into the document.
-${refContext ? "\nWhen quoting from reference materials, maintain accuracy." : ""}`;
+Task: Generate new text based on the author's request. Output ONLY the new text in plain text format. Do not add any explanations, markdown formatting, or commentary. Just return the text that can be inserted into the document. Your writing style MUST match the Style Lock above.
+${refContext ? "\nWhen using reference materials, quote FACTS only - never copy their writing style." : ""}`;
 
   const user = `${context ? `Surrounding context:\n<<<\n${context}\n>>>\n\n` : ""}Generation request: ${userPrompt}
 ${refContext}

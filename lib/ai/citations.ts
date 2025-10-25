@@ -202,8 +202,9 @@ export function formatReferenceContext(docs: DocumentRef[]): string {
   const filtered = docs.filter((doc) => doc.includeInGeneration);
   if (filtered.length === 0) return "";
   
-  let context = "\n\nReference Materials:\n";
-  context += "The following documents are provided as reference materials. You may quote from them when relevant, and citations will be added automatically.\n\n";
+  let context = "\n\nReference Materials (for FACTUAL CONTENT only):\n";
+  context += "IMPORTANT: These documents are for FACTUAL content and citations ONLY. DO NOT copy the writing style from these documents. Your writing style must come ONLY from the Style Lock above.\n";
+  context += "You may quote facts, data, or specific information from these documents when relevant. Citations will be added automatically.\n\n";
   
   filtered.forEach((doc, index) => {
     // Truncate very long documents
