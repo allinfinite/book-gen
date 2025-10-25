@@ -22,6 +22,54 @@ interface ChapterEditorProps {
   placeholder?: string;
 }
 
+/**
+ * Convert plain text with newlines and markdown to HTML paragraphs for TipTap
+ */
+function textToHtml(text: string): string {
+  if (!text) return "";
+  
+  // If already HTML (contains tags), return as-is
+  if (text.includes("<p>") || text.includes("<h1>") || text.includes("<div>")) {
+    return text;
+  }
+  
+  // Split by double newlines to preserve paragraph breaks
+  const paragraphs = text
+    .split(/\n\n+/) // Split on 2+ newlines
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+  
+  // Convert markdown-like patterns to HTML
+  return paragraphs
+    .map(p => {
+      let html = p;
+      
+      // Convert markdown headings: ## Heading -> <h2>Heading</h2>
+      if (html.startsWith("### ")) {
+        return `<h3>${html.substring(4)}</h3>`;
+      }
+      if (html.startsWith("## ")) {
+        return `<h2>${html.substring(3)}</h2>`;
+      }
+      if (html.startsWith("# ")) {
+        return `<h1>${html.substring(2)}</h1>`;
+      }
+      
+      // Convert markdown bold: **text** -> <strong>text</strong>
+      html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      
+      // Convert markdown italic: *text* or _text_ -> <em>text</em>
+      // Use underscore for italic to avoid conflicts with bold
+      html = html.replace(/_(.+?)_/g, "<em>$1</em>");
+      
+      // Replace single newlines with <br> tags
+      html = html.replace(/\n/g, "<br>");
+      
+      return `<p>${html}</p>`;
+    })
+    .join("");
+}
+
 export function ChapterEditor({
   content,
   onChange,
@@ -57,8 +105,16 @@ export function ChapterEditor({
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getText()) {
-      editor.commands.setContent(content);
+    if (!editor) return;
+    
+    // Convert plain text to HTML if needed
+    const htmlContent = textToHtml(content);
+    
+    // Only update if content has actually changed
+    // Compare the HTML content to avoid unnecessary updates
+    const currentHtml = editor.getHTML();
+    if (htmlContent !== currentHtml) {
+      editor.commands.setContent(htmlContent, false); // false = don't emit update event
     }
   }, [content, editor]);
 
