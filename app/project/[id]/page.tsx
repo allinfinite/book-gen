@@ -641,7 +641,14 @@ export default function ProjectPage() {
 
         {/* AI Sidebar */}
         {showAISidebar && selectedChapterId && (
-          <AISidebar chapterId={selectedChapterId} />
+          <AISidebar 
+            chapterId={selectedChapterId} 
+            sectionId={selectedSectionId}
+            onContentGenerated={(content) => {
+              // Insert AI-generated content into the current section
+              setSectionContent(content);
+            }}
+          />
         )}
       </div>
 

@@ -9,9 +9,11 @@ import { VoiceRecorder } from "./VoiceRecorder";
 
 interface AISidebarProps {
   chapterId: string;
+  sectionId: string | null;
+  onContentGenerated?: (content: string) => void;
 }
 
-export function AISidebar({ chapterId }: AISidebarProps) {
+export function AISidebar({ chapterId, sectionId, onContentGenerated }: AISidebarProps) {
   const currentProject = useProjectStore((state) => state.currentProject);
   const updateChapter = useProjectStore((state) => state.updateChapter);
   const isOnline = useUIStore((state) => state.isOnline);
@@ -36,8 +38,12 @@ export function AISidebar({ chapterId }: AISidebarProps) {
     setShowVoiceRecorder(false);
   }
 
-  async function handleGenerateChapter() {
-    if (!currentProject || !isOnline) return;
+  async function handleGenerateSection() {
+    if (!currentProject || !isOnline || !sectionId) return;
+
+    const chapter = currentProject.chapters.find((ch) => ch.id === chapterId);
+    const section = chapter?.sections.find((s) => s.id === sectionId);
+    if (!chapter || !section) return;
 
     setIsGenerating(true);
     setGeneratedContent("");
@@ -49,10 +55,10 @@ export function AISidebar({ chapterId }: AISidebarProps) {
     try {
       await streamGenerate(
         {
-          task: "chapter_draft",
+          task: "section_draft",
           project: currentProject,
           targetId: chapterId,
-          userBrief: userPrompt || undefined,
+          userBrief: `${section.title}\n${userPrompt}`,
         },
         {
           onContent: (content) => {
@@ -86,28 +92,10 @@ export function AISidebar({ chapterId }: AISidebarProps) {
   }
 
   function handleAcceptContent() {
-    if (!currentProject || !generatedContent) return;
+    if (!currentProject || !generatedContent || !sectionId) return;
 
-    const chapter = currentProject.chapters.find((ch) => ch.id === chapterId);
-    if (!chapter) return;
-
-    // Parse generated content into sections
-    const sections = generatedContent
-      .split(/\n## /)
-      .filter((s) => s.trim())
-      .map((sectionText, idx) => {
-        const [titleLine, ...contentLines] = sectionText.split("\n");
-        return {
-          id: crypto.randomUUID(),
-          title: titleLine.replace(/^## /, "").trim() || `Section ${idx + 1}`,
-          content: contentLines.join("\n").trim(),
-        };
-      });
-
-    updateChapter(chapterId, {
-      sections: sections.length > 0 ? sections : chapter.sections,
-      status: "draft",
-    });
+    // Simply pass the generated content to the parent for insertion
+    onContentGenerated?.(generatedContent);
 
     setGeneratedContent("");
     setUserPrompt("");
@@ -118,6 +106,7 @@ export function AISidebar({ chapterId }: AISidebarProps) {
   }
 
   const chapter = currentProject?.chapters.find((ch) => ch.id === chapterId);
+  const section = chapter?.sections.find((s) => s.id === sectionId);
 
   return (
     <aside className="w-96 border-l border-border bg-card overflow-y-auto">
@@ -133,13 +122,27 @@ export function AISidebar({ chapterId }: AISidebarProps) {
         )}
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* User Prompt */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium">
-              Chapter Brief
-            </label>
+      {!sectionId ? (
+        <div className="p-4 text-center text-muted-foreground text-sm">
+          <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p>Select a section to generate AI content</p>
+        </div>
+      ) : (
+        <div className="p-4 space-y-4">
+          {/* Current Section Info */}
+          {section && (
+            <div className="p-3 bg-muted/50 rounded-md border border-border">
+              <div className="text-xs text-muted-foreground mb-1">Generating for:</div>
+              <div className="font-medium text-sm">{section.title}</div>
+            </div>
+          )}
+
+          {/* User Prompt */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium">
+                Section Brief
+              </label>
             <button
               onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
               disabled={isGenerating || !isOnline}
@@ -165,7 +168,7 @@ export function AISidebar({ chapterId }: AISidebarProps) {
           <textarea
             value={userPrompt}
             onChange={(e) => setUserPrompt(e.target.value)}
-            placeholder="Describe what you want in this chapter... (type or use voice)"
+            placeholder="Describe what you want in this section... (type or use voice)"
             className="w-full px-3 py-2 border border-input rounded-md bg-background resize-none"
             rows={6}
             disabled={isGenerating || !isOnline}
@@ -174,7 +177,7 @@ export function AISidebar({ chapterId }: AISidebarProps) {
 
         {/* Generate Button */}
         <button
-          onClick={handleGenerateChapter}
+          onClick={handleGenerateSection}
           disabled={isGenerating || !isOnline}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -186,7 +189,7 @@ export function AISidebar({ chapterId }: AISidebarProps) {
           ) : (
             <>
               <Wand2 className="w-4 h-4" />
-              <span>Generate Chapter</span>
+              <span>Generate Section</span>
             </>
           )}
         </button>
@@ -242,32 +245,31 @@ export function AISidebar({ chapterId }: AISidebarProps) {
           </div>
         )}
 
-        {/* Chapter Info */}
-        {chapter && (
+        {/* Section Info */}
+        {section && (
           <div className="pt-4 border-t border-border">
-            <h4 className="text-sm font-medium mb-2">Chapter Info</h4>
+            <h4 className="text-sm font-medium mb-2">Section Info</h4>
             <dl className="space-y-1 text-xs">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Status:</dt>
-                <dd className="font-medium capitalize">{chapter.status}</dd>
+                <dt className="text-muted-foreground">Word Count:</dt>
+                <dd className="font-medium">
+                  {section.content.split(/\s+/).filter(Boolean).length}
+                </dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Sections:</dt>
-                <dd className="font-medium">{chapter.sections.length}</dd>
-              </div>
-              {currentProject?.targets.minChapterWords && (
+              {currentProject?.targets.minSectionWords && (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Target:</dt>
                   <dd className="font-medium">
-                    {currentProject.targets.minChapterWords}–
-                    {currentProject.targets.maxChapterWords} words
+                    {currentProject.targets.minSectionWords}–
+                    {currentProject.targets.maxSectionWords} words
                   </dd>
                 </div>
               )}
             </dl>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }
